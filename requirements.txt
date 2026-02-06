@@ -1,0 +1,4 @@
+shioaji
+python-dotenv
+pydantic
+pydantic-settings
