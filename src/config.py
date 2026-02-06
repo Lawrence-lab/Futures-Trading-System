@@ -1,6 +1,10 @@
+"""
+專案配置模組
+負責讀取並驗證環境變數設定。
+"""
 from pydantic_settings import BaseSettings
 from pydantic import Field
-import os
+
 
 class Settings(BaseSettings):
     api_key: str = Field(..., description="Shioaji API 金鑰")
@@ -13,7 +17,10 @@ class Settings(BaseSettings):
         env_file = ".env"
         env_file_encoding = "utf-8"
 
+
 try:
     settings = Settings()
 except Exception as e:
-    raise ValueError(f"配置驗證失敗。請確保 .env 檔案存在並包含所有必要的欄位: {e}")
+    raise ValueError(
+        f"配置驗證失敗。請確保 .env 檔案存在並包含所有必要的欄位: {e}"
+    ) from e

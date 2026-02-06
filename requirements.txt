@@ -2,3 +2,6 @@ shioaji
 python-dotenv
 pydantic
 pydantic-settings
+pytest
+pylint
+black
