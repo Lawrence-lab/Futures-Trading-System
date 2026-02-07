@@ -2,7 +2,7 @@
 主程式入口
 """
 import sys
-from src.connection import Trader
+#from src.connection import Trader
 
 
 def main():
@@ -10,11 +10,12 @@ def main():
     print("初始化永豐期貨交易系統...")
 
     try:
-        trader = Trader()
-        accounts = trader.login()
-        print(f"登入成功。可用帳戶數: {len(accounts)}")
-        for acc in accounts:
-            print(f" - {acc}")
+        #trader = Trader()
+        #accounts = trader.login()
+        #print(f"登入成功。可用帳戶數: {len(accounts)}")
+        #for acc in accounts:
+        #    print(f" - {acc}")
+        print("登入成功")
 
         # 未來: 在此初始化策略
         # strategy = MyStrategy(trader)
