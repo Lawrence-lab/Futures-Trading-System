@@ -2,6 +2,7 @@
 主程式入口
 """
 import sys
+import time
 #from src.connection import Trader
 
 
@@ -17,9 +18,14 @@ def main():
         #    print(f" - {acc}")
         print("登入成功")
 
-        # 未來: 在此初始化策略
-        # strategy = MyStrategy(trader)
-        # strategy.run()
+        # Keep the program running
+        print("系統運行中，按 Ctrl+C 停止...")
+        while True:
+            time.sleep(1)
+
+    except KeyboardInterrupt:
+        print("\n系統已停止")
+        sys.exit(0)
 
     except Exception as e:
         print(f"系統啟動失敗: {e}")
