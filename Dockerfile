@@ -19,4 +19,4 @@ COPY . .
 
 # Command to run on container start
 # Command to run on container start
-CMD ["python", "-m", "src.main"]
+CMD ["python", "/app/src/main.py"]  
