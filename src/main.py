@@ -7,6 +7,30 @@ import os
 # Add project root to system path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# Check for CERT_BASE64 and restore certificate
+if "CERT_BASE64" in os.environ:
+    import base64
+    try:
+        cert_b64 = os.environ["CERT_BASE64"]
+        # Determine strict path or use a default
+        cert_path = "/app/certs/trading_cert.pfx"
+        
+        # Ensure directory exists
+        os.makedirs(os.path.dirname(cert_path), exist_ok=True)
+        
+        print(f"Decoding CERT_BASE64 to {cert_path}...")
+        with open(cert_path, "wb") as f:
+            f.write(base64.b64decode(cert_b64))
+        print("Certificate restored successfully.")
+        
+        # Auto-configure CERT_PATH if not set
+        if "CERT_PATH" not in os.environ:
+            os.environ["CERT_PATH"] = cert_path
+            print(f"Automatically set CERT_PATH to {cert_path}")
+            
+    except Exception as e:
+        print(f"Warning: Failed to decode CERT_BASE64: {e}")
+
 import time
 from src.connection import Trader
 
