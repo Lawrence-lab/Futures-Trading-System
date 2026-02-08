@@ -12,8 +12,9 @@ if "CERT_BASE64" in os.environ:
     import base64
     try:
         cert_b64 = os.environ["CERT_BASE64"]
-        # Determine strict path or use a default
-        cert_path = "/app/certs/trading_cert.pfx"
+        
+        # Determine target path: Use CERT_PATH if set, otherwise default
+        cert_path = os.environ.get("CERT_PATH", "/app/certs/trading_cert.pfx")
         
         # Ensure directory exists
         os.makedirs(os.path.dirname(cert_path), exist_ok=True)
@@ -21,9 +22,15 @@ if "CERT_BASE64" in os.environ:
         print(f"Decoding CERT_BASE64 to {cert_path}...")
         with open(cert_path, "wb") as f:
             f.write(base64.b64decode(cert_b64))
-        print("Certificate restored successfully.")
         
-        # Auto-configure CERT_PATH if not set
+        # Verify file size
+        if os.path.exists(cert_path):
+             size = os.path.getsize(cert_path)
+             print(f"Certificate restored successfully. Size: {size} bytes")
+        else:
+             print("Error: Certificate file not found after writing.")
+
+        # Auto-configure CERT_PATH if not set (for consistency)
         if "CERT_PATH" not in os.environ:
             os.environ["CERT_PATH"] = cert_path
             print(f"Automatically set CERT_PATH to {cert_path}")
