@@ -14,31 +14,30 @@ if "CERT_BASE64" in os.environ:
         cert_b64 = os.environ["CERT_BASE64"]
         
         # Use /tmp for writable access (Zeabur /app might be read-only)
-        # We always overwrite CERT_PATH when using Base64 to ensure we point to the writable file
         filename = "trading_cert.pfx"
         # If user specified a specific filename in CERT_PATH, try to preserve it, but move to /tmp
         if "CERT_PATH" in os.environ:
              filename = os.path.basename(os.environ["CERT_PATH"])
              
-        cert_path = os.path.join("/tmp", filename)
+        cert_path = os.path.abspath(os.path.join("/tmp", filename))
         
-        print(f"Decoding CERT_BASE64 to {cert_path}...")
+        print(f"Decoding CERT_BASE64 to {cert_path}...", flush=True)
         with open(cert_path, "wb") as f:
             f.write(base64.b64decode(cert_b64))
         
         # Verify file size
         if os.path.exists(cert_path):
              size = os.path.getsize(cert_path)
-             print(f"Certificate restored successfully. Size: {size} bytes")
+             print(f"Certificate restored successfully. Size: {size} bytes", flush=True)
         else:
-             print("Error: Certificate file not found after writing.")
+             print("Error: Certificate file not found after writing.", flush=True)
 
         # FORCE update env var so config.py picks up the correct path
         os.environ["CERT_PATH"] = cert_path
-        print(f"Updated CERT_PATH to {cert_path}")
+        print(f"Updated CERT_PATH to {cert_path}", flush=True)
             
     except Exception as e:
-        print(f"Warning: Failed to decode CERT_BASE64: {e}")
+        print(f"Warning: Failed to decode CERT_BASE64: {e}", flush=True)
 
 import time
 from src.connection import Trader
