@@ -13,11 +13,14 @@ if "CERT_BASE64" in os.environ:
     try:
         cert_b64 = os.environ["CERT_BASE64"]
         
-        # Determine target path: Use CERT_PATH if set, otherwise default
-        cert_path = os.environ.get("CERT_PATH", "/app/certs/trading_cert.pfx")
-        
-        # Ensure directory exists
-        os.makedirs(os.path.dirname(cert_path), exist_ok=True)
+        # Use /tmp for writable access (Zeabur /app might be read-only)
+        # We always overwrite CERT_PATH when using Base64 to ensure we point to the writable file
+        filename = "trading_cert.pfx"
+        # If user specified a specific filename in CERT_PATH, try to preserve it, but move to /tmp
+        if "CERT_PATH" in os.environ:
+             filename = os.path.basename(os.environ["CERT_PATH"])
+             
+        cert_path = os.path.join("/tmp", filename)
         
         print(f"Decoding CERT_BASE64 to {cert_path}...")
         with open(cert_path, "wb") as f:
@@ -30,10 +33,9 @@ if "CERT_BASE64" in os.environ:
         else:
              print("Error: Certificate file not found after writing.")
 
-        # Auto-configure CERT_PATH if not set (for consistency)
-        if "CERT_PATH" not in os.environ:
-            os.environ["CERT_PATH"] = cert_path
-            print(f"Automatically set CERT_PATH to {cert_path}")
+        # FORCE update env var so config.py picks up the correct path
+        os.environ["CERT_PATH"] = cert_path
+        print(f"Updated CERT_PATH to {cert_path}")
             
     except Exception as e:
         print(f"Warning: Failed to decode CERT_BASE64: {e}")
