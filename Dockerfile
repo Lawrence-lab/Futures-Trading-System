@@ -18,4 +18,5 @@ COPY . .
 # For now, we assume the code structure is copied.
 
 # Command to run on container start
-CMD ["python", "src/main.py"]
+# Command to run on container start
+CMD ["python", "-m", "src.main"]
