@@ -2,6 +2,11 @@
 主程式入口
 """
 import sys
+import os
+
+# Add project root to system path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import time
 from src.connection import Trader
 
