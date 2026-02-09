@@ -43,8 +43,10 @@ class KLineMaker:
                 # 如果是 shioaji, quote.datetime 通常是 datetime.datetime
                 ts = datetime.fromisoformat(ts) 
 
-            # 取那一分鐘的開始時間 (去掉秒跟微秒)
-            bar_time = ts.replace(second=0, microsecond=0)
+            # 取那 5 分鐘的開始時間 (去掉秒跟微秒, 分鐘取 5 的倍數)
+            # 例如 10:03 -> 10:00, 10:05 -> 10:05, 10:09 -> 10:05
+            minute = (ts.minute // 5) * 5
+            bar_time = ts.replace(minute=minute, second=0, microsecond=0)
 
             # 2. 判斷是否需要切換 K 線
             if self.current_bar is None:

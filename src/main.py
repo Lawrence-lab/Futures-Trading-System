@@ -113,9 +113,9 @@ def main():
         trader.api.quote.subscribe(target_contract, quote_type=sj.constant.QuoteType.Tick)
         trader.api.quote.subscribe(target_contract, quote_type=sj.constant.QuoteType.BidAsk)
 
-        # Keep the program running and print quote every minute
+        # Keep the program running and print quote every 5 minutes
         print("系統運行中，按 Ctrl+C 停止...")
-        print("開始接收行情 (每分鐘更新一次)...")
+        print("開始接收行情 (每 5 分鐘更新一次)...")
         print("-" * 50)
         
         while True:
@@ -138,7 +138,7 @@ def main():
             else:
                 print(f"[{current_time}] 等待行情中...")
             
-            time.sleep(60)
+            time.sleep(300)
 
     except KeyboardInterrupt:
         print("\n系統正在停止...")
