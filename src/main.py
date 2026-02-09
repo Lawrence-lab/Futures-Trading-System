@@ -45,6 +45,7 @@ if "CERT_BASE64" in os.environ:
 import time
 import shioaji as sj
 from src.connection import Trader
+from src.processors.kline_maker import KLineMaker
 
 
 def main():
@@ -77,19 +78,31 @@ def main():
         # 定義行情儲存變數
         latest_quote = {}
 
+        # KLineMaker 初始化
+        kline_maker = KLineMaker()
+
         # 定義行情 Callback
         def on_quote(exchange, quote):
             # Shioaji quote object usually provides to_dict() or dict()
+            tick_data = {}
             if hasattr(quote, 'to_dict'):
-                latest_quote.update(quote.to_dict())
+                tick_data = quote.to_dict()
             elif hasattr(quote, 'dict'):
-                latest_quote.update(quote.dict())
+                tick_data = quote.dict()
             else:
                 # Fallback: try to act like a dict
                 try:
-                    latest_quote.update(quote)
+                    tick_data = dict(quote)
                 except:
                     print(f"DEBUG: Unknown quote type: {type(quote)}")
+                    return
+            
+            latest_quote.update(tick_data)
+            
+            # 更新 K 線
+            # 判斷是否為 Tick 資料 (含有 close 和 volume)
+            if 'close' in tick_data and 'volume' in tick_data:
+                kline_maker.update_with_tick(tick_data)
 
         # 設定 Callback (Futures/Options)
         trader.api.quote.set_on_tick_fop_v1_callback(on_quote)
@@ -100,9 +113,9 @@ def main():
         trader.api.quote.subscribe(target_contract, quote_type=sj.constant.QuoteType.Tick)
         trader.api.quote.subscribe(target_contract, quote_type=sj.constant.QuoteType.BidAsk)
 
-        # Keep the program running and print quote every second
+        # Keep the program running and print quote every minute
         print("系統運行中，按 Ctrl+C 停止...")
-        print("開始接收行情 (每秒更新一次)...")
+        print("開始接收行情 (每分鐘更新一次)...")
         print("-" * 50)
         
         while True:
@@ -125,7 +138,7 @@ def main():
             else:
                 print(f"[{current_time}] 等待行情中...")
             
-            time.sleep(1)
+            time.sleep(60)
 
     except KeyboardInterrupt:
         print("\n系統正在停止...")
