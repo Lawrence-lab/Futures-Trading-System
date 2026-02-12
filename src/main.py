@@ -59,27 +59,32 @@ def main():
         for acc in accounts:
             print(f" - {acc}")
         
-        # 尋找微型台指期 (MXF) 近月合約
-        print("正在尋找微型台指期 (MXF) 合約...")
-        # 這裡假設 MXF 在 Futures 下，且列表按到期日排序，第一個即為近月
+        # 尋找微型台指期 (TMF) 近月合約
+        print("正在尋找微型台指期 (TMF) 合約...")
+        # 這裡假設 TMF 在 Futures 下，且列表按到期日排序，第一個即為近月
         # 注意: 實際代碼可能需要根據 Shioaji 版本調整查找方式
-        mxf_contracts = [
-            c for c in trader.api.Contracts.Futures.MXF 
+        tmf_contracts = [
+            c for c in trader.api.Contracts.Futures.TMF 
             if c.code[-2:] not in ["R1", "R2"] # 排除跨月價差單
         ]
         
-        if not mxf_contracts:
-            print("找不到 MXF 合約，請確認 API 連線或合約下載狀態。")
+        if not tmf_contracts:
+            print("找不到 TMF 合約，請確認 API 連線或合約下載狀態。")
             sys.exit(1)
             
-        target_contract = mxf_contracts[0]
+        target_contract = tmf_contracts[0]
         print(f"鎖定合約: {target_contract.name} ({target_contract.code})")
 
         # 定義行情儲存變數
         latest_quote = {}
 
-        # KLineMaker 初始化
-        kline_maker = KLineMaker()
+        # KLineMaker 初始化 (5分K & 60分K)
+        maker_5m = KLineMaker(timeframe=5)
+        maker_60m = KLineMaker(timeframe=60)
+        
+        # 策略初始化
+        from src.strategies.dual_logic import DualTimeframeStrategy
+        strategy = DualTimeframeStrategy()
 
         # 定義行情 Callback
         def on_quote(exchange, quote):
@@ -94,7 +99,7 @@ def main():
                 try:
                     tick_data = dict(quote)
                 except:
-                    print(f"DEBUG: Unknown quote type: {type(quote)}")
+                    # print(f"DEBUG: Unknown quote type: {type(quote)}")
                     return
             
             latest_quote.update(tick_data)
@@ -102,7 +107,21 @@ def main():
             # 更新 K 線
             # 判斷是否為 Tick 資料 (含有 close 和 volume)
             if 'close' in tick_data and 'volume' in tick_data:
-                kline_maker.update_with_tick(tick_data)
+                try:
+                    # 同時餵給 5m 與 60m Maker
+                    is_new_60m = maker_60m.update_with_tick(tick_data)
+                    is_new_5m = maker_5m.update_with_tick(tick_data)
+                    
+                    # 當 5m K 線完成時，進行策略判斷
+                    if is_new_5m:
+                        df_5m = maker_5m.get_dataframe()
+                        df_60m = maker_60m.get_dataframe()
+                        
+                        # 呼叫策略檢查訊號
+                        strategy.check_signals(df_5m, df_60m)
+                        
+                except Exception as e:
+                    print(f"Error in on_quote strategy logic: {e}")
 
         # 設定 Callback (Futures/Options)
         trader.api.quote.set_on_tick_fop_v1_callback(on_quote)
@@ -113,32 +132,66 @@ def main():
         trader.api.quote.subscribe(target_contract, quote_type=sj.constant.QuoteType.Tick)
         trader.api.quote.subscribe(target_contract, quote_type=sj.constant.QuoteType.BidAsk)
 
-        # Keep the program running and print quote every 5 minutes
+        # Keep the program running and print quote every 1 minute
         print("系統運行中，按 Ctrl+C 停止...")
-        print("開始接收行情 (每 5 分鐘更新一次)...")
+        print("開始接收行情 (每 1 分鐘更新監控日誌)...")
         print("-" * 50)
         
         while True:
-            current_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
-            
-            if latest_quote:
-                # 格式化輸出行情
-                # tick 內容範例: {'code': 'MXF...', 'datetime': ..., 'close': 16000, 'volume': 1, ...}
-                # 注意: 模擬環境可能不會收到真實 tick，視情況而定
-                price = latest_quote.get('close', latest_quote.get('price', '-'))
-                vol = latest_quote.get('volume', '-')
-                bid = latest_quote.get('bid_price', '-') # 可能是 list
-                ask = latest_quote.get('ask_price', '-') # 可能是 list
+            try:
+                current_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
                 
-                # 簡單處理 bid/ask 如果是 list 取第一個
-                if isinstance(bid, list) and bid: bid = bid[0]
-                if isinstance(ask, list) and ask: ask = ask[0]
+                if latest_quote:
+                    # 取得目前價格
+                    price = latest_quote.get('close', latest_quote.get('price', 0))
+                    
+                    # 取得策略狀態
+                    # 60m 趨勢 (需要從策略內部或重新計算取得，這邊簡單起見，我們讓策略印出即可，或者這裡只印狀態)
+                    # 為了符合需求: [Monitor] 60M: {Trend} | 5M Price: {Close} | Position: {is_long}
+                    # 我們可以存取 strategy 的屬性，但 Trend 狀態沒有直接存。
+                    # 我們可以稍微修改 strategy 讓他 expose 狀態，或者這裡只印 Position。
+                    # 但需求明確說要印 Trend。
+                    # 我們可以在這裡拿 df_60m 算一下 supertrend，或是 refactor strategy 儲存狀態。
+                    # 鑑於保持簡單，我先讀取 strategy 內的變數 (如果有的話)。
+                    # 目前 strategy 只有 is_long。
+                    # 讓我們假設 check_signals 會印出重要訊息，這裡做定時的心跳包。
+                    
+                    # 為了取得 60M Trend，我們得再算一次，或者在 strategy 內記下來。
+                    # 比較好的是在 strategy 內加個屬性 current_trend_status。
+                    # 但現在先不改 strategy，我們在 main 裡用 df_60m 算一下也行，或者只印 Position。
+                    # 根據需求：『[Monitor] 60M: {Trend} | 5M Price: {Close} | Position: {is_long}』
+                    
+                    pos_status = "LONG" if strategy.is_long else "EMPTY"
+                    
+                    # 嘗試計算 60m trend 僅供顯示
+                    trend_status = "WAITING"
+                    df_60m = maker_60m.get_dataframe()
+                    if not df_60m.empty and len(df_60m) > 10:
+                        from src.strategies.indicators import calculate_supertrend
+                        is_bull, _ = calculate_supertrend(df_60m)
+                        trend_status = "BULL" if is_bull else "BEAR"
+                    
+                    # Calculate Days to Expiry
+                    # target_contract.delivery_date format is usually 'YYYY/MM/DD' or 'YYYYMMDD' depending on object
+                    # Shioaji contract.delivery_date is 'YYYYMMDD' string usually
+                    try:
+                         today = datetime.now().date()
+                         # Assuming delivery_date is '20260218'
+                         d_str = target_contract.delivery_date
+                         d_date = datetime.strptime(d_str, "%Y%m%d").date()
+                         days_left = (d_date - today).days
+                    except:
+                         days_left = "?"
 
-                print(f"[{current_time}] {target_contract.name} | 成交: {price} | 單量: {vol} | 買進: {bid} | 賣出: {ask}")
-            else:
-                print(f"[{current_time}] 等待行情中...")
-            
-            time.sleep(300)
+                    print(f"[{current_time}] [Monitor] Expiry: {days_left}d | 60M: {trend_status} | 5M Price: {price} | Position: {pos_status} | Entry: {strategy.entry_price}")
+                    
+                else:
+                    print(f"[{current_time}] 等待行情中...")
+                
+                time.sleep(60)
+            except Exception as e:
+                print(f"Error in monitor loop: {e}")
+                time.sleep(60)
 
     except KeyboardInterrupt:
         print("\n系統正在停止...")
