@@ -15,6 +15,13 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.connection import Trader
 from src.strategies.dual_logic import DualTimeframeStrategy
+import logging
+
+# Configure logging to show strategy output
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
 
 def main():
     print("Initializing Backtest...")
@@ -208,7 +215,9 @@ def main():
 
     # 5. Simulation Loop
     print("Running simulation...")
-    strategy = DualTimeframeStrategy()
+    strategy = DualTimeframeStrategy(name="Gatekeeper-MXF-V1_Backtest")
+    # from src.strategies.rubber_band import RubberBandStrategy
+    # strategy = RubberBandStrategy(name="RubberBand_V1_Backtest")
     
     # Pre-calculate 60m indices
     times_60m = df_60m['datetime'].values
@@ -303,19 +312,9 @@ def main():
             else:
                  is_bull_60m = df_60m['is_uptrend'].iloc[idx_safe]
 
-        # Pass "dummy" DFs to satisfy signature, but pass pre-calc values
-        # strategy.check_signals(df_5m_slice, df_60m_slice, ...)
-        # Passing empty DFs might trigger 'if empty: return'.
-        # So we pass non-empty one-row DFs just in case, or modify strategy to not check empty if precalc is there.
-        # Strategy checks: `if df_5m.empty or df_60m.empty: return`
-        # We must pass something.
-        # Passing `df_5m.iloc[[i]]` is cheap.
-        
-        # Optimization: Don't slice everything.
-        # Just pass the current row as a single-row DF.
-        
+        # Prepare inputs for DualTimeframeStrategy
+        # Passing single-row DF for correctness with current DualLogic implementation
         df_5m_row = df_5m.iloc[[i]]
-        # df_60m is not used if we pass pre-calc, but must be not empty.
         df_60m_dummy = df_60m.iloc[[0]] 
         
         strategy.check_signals(
@@ -376,7 +375,7 @@ def main():
     pd.set_option('display.max_columns', None)
     pd.set_option('display.width', 1000)
     pd.set_option('display.max_rows', None)
-    print(trade_df[['entry_time', 'exit_time', 'entry_price', 'exit_price', 'reason', 'pnl']])
+    print(trade_df[['strategy', 'entry_time', 'exit_time', 'entry_price', 'exit_price', 'reason', 'pnl']])
     
     # Determine exit code
     sys.exit(0)

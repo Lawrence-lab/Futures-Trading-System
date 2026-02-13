@@ -4,7 +4,8 @@ from datetime import datetime
 from .indicators import calculate_supertrend, calculate_ut_bot, calculate_atr
 
 class DualTimeframeStrategy:
-    def __init__(self):
+    def __init__(self, name="DualTimeframe"):
+        self.name = name
         self.is_long = False
         self.entry_price = 0.0
         self.entry_time = None
@@ -69,7 +70,7 @@ class DualTimeframeStrategy:
                 self.stop_loss = current_price - stop_dist
                 self.break_even_triggered = False
                 
-                logging.info(f"[SIGNAL] 買入進場 | 時間: {current_time} | 價格: {self.entry_price} | 實體: {current_price - current_open:.1f} | ATR: {current_atr:.1f} | 停損: {self.stop_loss:.1f}")
+                logging.info(f"[{self.name}] [SIGNAL] 買入進場 | 時間: {current_time} | 價格: {self.entry_price} | 實體: {current_price - current_open:.1f} | ATR: {current_atr:.1f} | 停損: {self.stop_loss:.1f}")
         
         # Exit / Risk Management Logic
         else:
@@ -80,7 +81,7 @@ class DualTimeframeStrategy:
             if not self.break_even_triggered and profit >= self.be_threshold:
                 self.stop_loss = self.entry_price
                 self.break_even_triggered = True
-                logging.info(f"[RISK] 啟動保本 | 時間: {current_time} | 目前價格: {current_price} | 停損移至成本: {self.stop_loss}")
+                logging.info(f"[{self.name}] [RISK] 啟動保本 | 時間: {current_time} | 目前價格: {current_price} | 停損移至成本: {self.stop_loss}")
             
             # Check Exit Conditions
             exit_reason = None
@@ -97,9 +98,10 @@ class DualTimeframeStrategy:
             if exit_reason:
                 self.is_long = False
                 pnl = current_price - self.entry_price
-                logging.info(f"[EXIT] {exit_reason} | 時間: {current_time} | 出場價格: {current_price} | 損益: {pnl}")
+                logging.info(f"[{self.name}] [EXIT] {exit_reason} | 時間: {current_time} | 出場價格: {current_price} | 損益: {pnl}")
                 
                 self.trades.append({
+                    'strategy': self.name,
                     'entry_time': self.entry_time,
                     'exit_time': current_time,
                     'entry_price': self.entry_price,

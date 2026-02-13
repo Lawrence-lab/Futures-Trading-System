@@ -84,7 +84,7 @@ def main():
         
         # 策略初始化
         from src.strategies.dual_logic import DualTimeframeStrategy
-        strategy = DualTimeframeStrategy()
+        strategy = DualTimeframeStrategy(name="Gatekeeper-MXF-V1")
 
         # 定義行情 Callback
         def on_quote(exchange, quote):
