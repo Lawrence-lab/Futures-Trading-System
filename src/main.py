@@ -43,6 +43,7 @@ if "CERT_BASE64" in os.environ:
         print(f"Warning: Failed to decode CERT_BASE64: {e}", flush=True)
 
 import time
+from datetime import datetime
 import shioaji as sj
 from src.connection import Trader
 from src.processors.kline_maker import KLineMaker
@@ -84,7 +85,10 @@ def main():
         
         # 策略初始化
         from src.strategies.dual_logic import DualTimeframeStrategy
-        strategy = DualTimeframeStrategy(name="Gatekeeper-MXF-V1")
+        strategies = [
+            DualTimeframeStrategy(name="Gatekeeper-MXF-V1"),
+            # Future strategies can be added here
+        ]
 
         # 定義行情 Callback
         def on_quote(exchange, quote):
@@ -118,7 +122,8 @@ def main():
                         df_60m = maker_60m.get_dataframe()
                         
                         # 呼叫策略檢查訊號
-                        strategy.check_signals(df_5m, df_60m)
+                        for strategy in strategies:
+                            strategy.check_signals(df_5m, df_60m)
                         
                 except Exception as e:
                     print(f"Error in on_quote strategy logic: {e}")
@@ -145,45 +150,12 @@ def main():
                     # 取得目前價格
                     price = latest_quote.get('close', latest_quote.get('price', 0))
                     
-                    # 取得策略狀態
-                    # 60m 趨勢 (需要從策略內部或重新計算取得，這邊簡單起見，我們讓策略印出即可，或者這裡只印狀態)
-                    # 為了符合需求: [Monitor] 60M: {Trend} | 5M Price: {Close} | Position: {is_long}
-                    # 我們可以存取 strategy 的屬性，但 Trend 狀態沒有直接存。
-                    # 我們可以稍微修改 strategy 讓他 expose 狀態，或者這裡只印 Position。
-                    # 但需求明確說要印 Trend。
-                    # 我們可以在這裡拿 df_60m 算一下 supertrend，或是 refactor strategy 儲存狀態。
-                    # 鑑於保持簡單，我先讀取 strategy 內的變數 (如果有的話)。
-                    # 目前 strategy 只有 is_long。
-                    # 讓我們假設 check_signals 會印出重要訊息，這裡做定時的心跳包。
+                    print(f"[{current_time}] [Monitor] Expiry: {days_left}d | 60M: {trend_status} | 5M Price: {price}")
                     
-                    # 為了取得 60M Trend，我們得再算一次，或者在 strategy 內記下來。
-                    # 比較好的是在 strategy 內加個屬性 current_trend_status。
-                    # 但現在先不改 strategy，我們在 main 裡用 df_60m 算一下也行，或者只印 Position。
-                    # 根據需求：『[Monitor] 60M: {Trend} | 5M Price: {Close} | Position: {is_long}』
-                    
-                    pos_status = "LONG" if strategy.is_long else "EMPTY"
-                    
-                    # 嘗試計算 60m trend 僅供顯示
-                    trend_status = "WAITING"
-                    df_60m = maker_60m.get_dataframe()
-                    if not df_60m.empty and len(df_60m) > 10:
-                        from src.strategies.indicators import calculate_supertrend
-                        is_bull, _ = calculate_supertrend(df_60m)
-                        trend_status = "BULL" if is_bull else "BEAR"
-                    
-                    # Calculate Days to Expiry
-                    # target_contract.delivery_date format is usually 'YYYY/MM/DD' or 'YYYYMMDD' depending on object
-                    # Shioaji contract.delivery_date is 'YYYYMMDD' string usually
-                    try:
-                         today = datetime.now().date()
-                         # Assuming delivery_date is '20260218'
-                         d_str = target_contract.delivery_date
-                         d_date = datetime.strptime(d_str, "%Y%m%d").date()
-                         days_left = (d_date - today).days
-                    except:
-                         days_left = "?"
-
-                    print(f"[{current_time}] [Monitor] Expiry: {days_left}d | 60M: {trend_status} | 5M Price: {price} | Position: {pos_status} | Entry: {strategy.entry_price}")
+                    # Print status for each strategy
+                    for strategy in strategies:
+                        pos_status = "LONG" if strategy.is_long else "EMPTY"
+                        print(f"   -> [{strategy.name}] Position: {pos_status} | Entry: {strategy.entry_price}")
                     
                 else:
                     print(f"[{current_time}] 等待行情中...")
