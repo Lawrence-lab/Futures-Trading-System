@@ -17,5 +17,9 @@ COPY . .
 # Since .env and certs are sensitive, they might be mounted as volumes or secrets in Zeabur.
 # For now, we assume the code structure is copied.
 
-# Start both Streamlit (listening on $PORT) and the main.py worker background process
-CMD python src/main.py & streamlit run app.py --server.port ${PORT:-8080} --server.address 0.0.0.0
+# Copy and prepare the start script
+COPY start.sh /app/start.sh
+RUN chmod +x /app/start.sh
+
+# Run the start script
+CMD ["/app/start.sh"]
