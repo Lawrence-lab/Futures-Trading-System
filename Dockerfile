@@ -19,7 +19,7 @@ COPY . .
 
 # Copy and prepare the start script
 COPY start.sh /app/start.sh
-RUN chmod +x /app/start.sh
+RUN sed -i 's/\r$//' /app/start.sh && chmod +x /app/start.sh
 
 # Run the start script
 CMD ["/app/start.sh"]
