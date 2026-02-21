@@ -17,6 +17,5 @@ COPY . .
 # Since .env and certs are sensitive, they might be mounted as volumes or secrets in Zeabur.
 # For now, we assume the code structure is copied.
 
-# Command to run on container start
-# Command to run on container start
-CMD ["python", "/app/src/main.py"]  
+# Start both Streamlit (listening on $PORT) and the main.py worker background process
+CMD streamlit run app.py --server.port ${PORT:-8080} --server.address 0.0.0.0 & python src/main.py
