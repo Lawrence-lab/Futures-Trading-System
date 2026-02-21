@@ -7,3 +7,4 @@ pylint
 black
 requests
 pandas
+psycopg2-binary
