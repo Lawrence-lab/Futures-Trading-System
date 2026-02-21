@@ -48,6 +48,7 @@ import shioaji as sj
 from src.connection import Trader
 from src.processors.kline_maker import KLineMaker
 from src.line_notify import send_line_push_message
+from src.db_logger import log_daily_equity
 
 
 def main():
@@ -199,6 +200,34 @@ def main():
                         msg_close = f"📊 今日任務結束。\n狀態：{pos_status_str}\n本日盈虧：{total_pnl:.1f} 點。"
                         send_line_push_message(msg_close)
                         notified_close = True
+                        
+                        # --- Log Daily Equity to PostgreSQL ---
+                        try:
+                            # 取得這帳戶的權益數
+                            # 注意: Shioaji 取得帳務資訊可能會需要憑證與簽章
+                            # 這裡使用 trader.api.account_balance 取得保證金資訊 (如果是期貨)
+                            # 由於微型台指是期貨，我們需要呼叫期貨保證金查詢
+                            acc = trader.api.handle_active_account
+                            if acc:
+                                margin_res = trader.api.margin(acc)
+                                if margin_res:
+                                    # margin_res 通常是 list of dict
+                                    margin_data = margin_res[0] if isinstance(margin_res, list) and len(margin_res) > 0 else margin_res
+                                    
+                                    # 嘗試從 Margin 物件或字典中取值
+                                    t_equity = getattr(margin_data, 'equity', 0.0) 
+                                    if not t_equity and isinstance(margin_data, dict):
+                                        t_equity = margin_data.get('equity', 0.0)
+                                        
+                                    a_margin = getattr(margin_data, 'available_margin', 0.0)
+                                    if not a_margin and isinstance(margin_data, dict):
+                                        a_margin = margin_data.get('available_margin', 0.0)
+                                        
+                                    log_daily_equity(current_date, total_equity=float(t_equity), available_margin=float(a_margin))
+                                    print(f"[{current_time}] 已將本日權益數 ({t_equity}) 記錄至資料庫。")
+                        except Exception as e:
+                            print(f"取得權益數或寫入資料庫失敗: {e}")
+                        # --------------------------------------
                     # ===================
                     
                     # Handle undefined variables conditionally

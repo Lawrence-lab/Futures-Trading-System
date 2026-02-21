@@ -3,6 +3,8 @@ import pandas as pd
 from datetime import datetime
 from .indicators import calculate_supertrend, calculate_ut_bot, calculate_atr
 from src.line_notify import send_line_push_message
+from src.db_logger import log_trade_entry, log_trade_exit
+
 class DualTimeframeStrategy:
     def __init__(self, name="DualTimeframe"):
         self.name = name
@@ -12,6 +14,7 @@ class DualTimeframeStrategy:
         self.highest_price = 0.0
         self.stop_loss = 0.0
         self.break_even_triggered = False
+        self.current_db_trade_id = -1
         
         self.trades = [] # List to store trade history: {entry_time, exit_time, entry_price, exit_price, pnl, reason}
         
@@ -78,6 +81,14 @@ class DualTimeframeStrategy:
                 ratio = round((body / candle_range * 100), 2) if candle_range > 0 else 0
                 msg = f"🎯 門神出擊！\n方向：做多 (LONG)\n點位：{self.entry_price}\n停損：{self.stop_loss:.1f}\n目前的 Body Ratio：{ratio}%"
                 send_line_push_message(msg)
+                
+                # Write to database (Trade Entry)
+                self.current_db_trade_id = log_trade_entry(
+                    strategy_name=self.name,
+                    side="Buy",
+                    entry_price=float(self.entry_price),
+                    entry_time=current_time
+                )
         
         # Exit / Risk Management Logic
         else:
@@ -116,3 +127,13 @@ class DualTimeframeStrategy:
                     'pnl': pnl,
                     'reason': exit_reason
                 })
+                
+                # Update database (Trade Exit)
+                if self.current_db_trade_id != -1:
+                    log_trade_exit(
+                        trade_id=self.current_db_trade_id,
+                        exit_price=float(current_price),
+                        exit_time=current_time,
+                        pnl_points=float(pnl)
+                    )
+                    self.current_db_trade_id = -1
