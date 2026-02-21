@@ -5,3 +5,5 @@ pydantic-settings
 pytest
 pylint
 black
+requests
+pandas

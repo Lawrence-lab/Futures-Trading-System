@@ -2,7 +2,7 @@ import logging
 import pandas as pd
 from datetime import datetime
 from .indicators import calculate_supertrend, calculate_ut_bot, calculate_atr
-
+from src.line_notify import send_line_push_message
 class DualTimeframeStrategy:
     def __init__(self, name="DualTimeframe"):
         self.name = name
@@ -71,6 +71,13 @@ class DualTimeframeStrategy:
                 self.break_even_triggered = False
                 
                 logging.info(f"[{self.name}] [SIGNAL] 買入進場 | 時間: {current_time} | 價格: {self.entry_price} | 實體: {current_price - current_open:.1f} | ATR: {current_atr:.1f} | 停損: {self.stop_loss:.1f}")
+                
+                # LINE Notify: Entry
+                body = current_price - current_open
+                candle_range = current_bar['high'] - current_bar['low']
+                ratio = round((body / candle_range * 100), 2) if candle_range > 0 else 0
+                msg = f"🎯 門神出擊！\n方向：做多 (LONG)\n點位：{self.entry_price}\n停損：{self.stop_loss:.1f}\n目前的 Body Ratio：{ratio}%"
+                send_line_push_message(msg)
         
         # Exit / Risk Management Logic
         else:

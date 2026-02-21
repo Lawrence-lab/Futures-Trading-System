@@ -47,6 +47,7 @@ from datetime import datetime
 import shioaji as sj
 from src.connection import Trader
 from src.processors.kline_maker import KLineMaker
+from src.line_notify import send_line_push_message
 
 
 def main():
@@ -142,14 +143,67 @@ def main():
         print("開始接收行情 (每 1 分鐘更新監控日誌)...")
         print("-" * 50)
         
+        notified_open = False
+        notified_close = False
+        last_date = ""
+
         while True:
             try:
                 current_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+                current_date = time.strftime("%Y-%m-%d", time.localtime())
+                current_hm = time.strftime("%H:%M", time.localtime())
+                
+                if current_date != last_date:
+                    notified_open = False
+                    notified_close = False
+                    last_date = current_date
                 
                 if latest_quote:
                     # 取得目前價格
                     price = latest_quote.get('close', latest_quote.get('price', 0))
                     
+                    # === LINE Notify ===
+                    if current_hm == "08:46" and not notified_open:
+                        df_5m = maker_5m.get_dataframe()
+                        atr_val = "N/A"
+                        if not df_5m.empty and 'atr' in df_5m.columns:
+                            atr_val = f"{df_5m.iloc[-1]['atr']:.2f}"
+                        elif not df_5m.empty:
+                            from src.strategies.indicators import calculate_atr
+                            atr_series = calculate_atr(df_5m, period=10)
+                            if not atr_series.empty:
+                                atr_val = f"{atr_series.iloc[-1]:.2f}"
+                                
+                        msg_open = f"✅ 門神已就位！今日開盤價：{price}，ATR 波動率：{atr_val}，Body Filter 閾值已鎖定。"
+                        send_line_push_message(msg_open)
+                        notified_open = True
+                        
+                    if current_hm == "13:46" and not notified_close:
+                        pos_status_list = []
+                        total_pnl = 0.0
+                        for strategy in strategies:
+                            status = "持倉中(多)" if strategy.is_long else "空手"
+                            pos_status_list.append(f"{strategy.name}: {status}")
+                            
+                            # 計算本日已實現損益 (包含可能未平倉的損益)
+                            today_trades = [t for t in strategy.trades if isinstance(t['exit_time'], datetime) and t['exit_time'].strftime("%Y-%m-%d") == current_date]
+                            for t in today_trades:
+                                total_pnl += t['pnl']
+                                
+                            if strategy.is_long:
+                                floating_pnl = price - strategy.entry_price
+                                total_pnl += floating_pnl
+                                pos_status_list[-1] += f" (未平倉損益: {floating_pnl:.1f})"
+                                
+                        pos_status_str = " | ".join(pos_status_list) if pos_status_list else "無"
+                        msg_close = f"📊 今日任務結束。\n狀態：{pos_status_str}\n本日盈虧：{total_pnl:.1f} 點。"
+                        send_line_push_message(msg_close)
+                        notified_close = True
+                    # ===================
+                    
+                    # Handle undefined variables conditionally
+                    days_left = "N/A" 
+                    trend_status = "N/A"
                     print(f"[{current_time}] [Monitor] Expiry: {days_left}d | 60M: {trend_status} | 5M Price: {price}")
                     
                     # Print status for each strategy
