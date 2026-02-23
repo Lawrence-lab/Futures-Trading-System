@@ -89,5 +89,19 @@ python src/main.py
 系統在啟動時會自動選擇近月合約 (Near-Month Contract)。
 > **建議**: 請在結算日 (每月第三個週三) 收盤後，手動重啟程式以切換至新的近月合約。請留意日誌中的 `[Monitor] Expiry: X days` 提示。
 
+## Zeabur 部署指南 (Zeabur Deployment)
+
+本專案已針對 Zeabur 雲端平台進行最佳化配置，確保背景交易程式與前台 Streamlit 儀表板能同時運行於單一容器中。
+
+### 部署注意事項與雷區：
+1. **不要使用 `Procfile` 或 `nixpacks.toml`**: 
+   Zeabur 內部的 Nixpacks 建置系統若偵測到 Python 專案，預設會強制執行 `python src/main.py`。若試圖用 `Procfile` 自定義 `web` 和 `worker` 程序，極易導致 Streamlit 網頁服務無法被正確綁定到對外 Port 而引發 **502 Bad Gateway**。
+2. **單一進入點 (`src/main.py`)**: 
+   為了突破雲端平台的啟動限制，本專案將 Streamlit 伺服器的啟動邏輯直接寫入 `src/main.py` 的主程式區塊。只要 Zeabur 執行了 `main.py`，Python 就會在背景生成一個 subprocess 獨立拉起儀表板。
+3. **對外 Port 綁定**: 
+   確保 `Dockerfile` 內有 `EXPOSE 8080`，並配合專案根目錄的 `zeabur.json` (指定 `"port": 8080`)，讓 Zeabur 的路由精確導向 Streamlit 所在的連線埠。
+4. **環境變數 (Environment Variables)**: 
+   請務必在 Zeabur 的控制台面板中，將 `.env` 內的機密變數 (如 `DATABASE_URL`, `API_KEY`, `CERT_BASE64` 等) 填寫至「環境變數」設定區塊中。
+
 ## 授權 (License)
 MIT
