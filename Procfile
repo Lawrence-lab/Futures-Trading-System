@@ -1,2 +1,2 @@
-web: streamlit run app.py --server.port $PORT --server.address 0.0.0.0
+web: streamlit run app.py --server.port ${PORT:-8080} --server.address 0.0.0.0 --server.headless true --server.enableCORS false
 worker: python -m src.main

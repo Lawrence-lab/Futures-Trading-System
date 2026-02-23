@@ -21,5 +21,9 @@ COPY . .
 COPY start.sh /app/start.sh
 RUN sed -i 's/\r$//' /app/start.sh && chmod +x /app/start.sh
 
+# Expose port and configure environment
+EXPOSE 8080
+ENV PORT=8080
+
 # Run the start script
 CMD ["/app/start.sh"]
