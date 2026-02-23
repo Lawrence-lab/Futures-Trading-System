@@ -53,6 +53,23 @@ from src.db_logger import log_daily_equity
 
 def main():
     """系統主進入點"""
+    import subprocess
+    import sys
+    import os
+    
+    port = os.environ.get("PORT", "8080")
+    print(f"🚀 [main.py] 啟動 Streamlit 儀表板 (Port: {port})...", flush=True)
+    try:
+        subprocess.Popen(
+            [sys.executable, "-m", "streamlit", "run", "app.py", 
+             "--server.port", port, 
+             "--server.address", "0.0.0.0", 
+             "--server.headless", "true", 
+             "--server.enableCORS", "false"]
+        )
+    except Exception as e:
+        print(f"⚠️ 無法啟動 Streamlit: {e}", flush=True)
+
     print("初始化永豐期貨交易系統...")
 
     try:
