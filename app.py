@@ -1,6 +1,10 @@
 import streamlit as st
 import pandas as pd
+import warnings
 from src.db_logger import get_streamlit_db_connection
+
+# Suppress Pandas SQLAlchemy warning since we use direct psycopg2 connection here
+warnings.filterwarnings('ignore', category=UserWarning, module='pandas')
 
 st.set_page_config(page_title="交易追蹤儀表板", layout="wide")
 st.title("📈 演算法交易追蹤儀表板")
@@ -75,7 +79,7 @@ try:
         ORDER BY id DESC
         LIMIT 50;
     """, conn)
-    st.dataframe(df_trades, use_container_width=True)
+    st.dataframe(df_trades, width="stretch")
     
 except Exception as e:
     st.error(f"讀取資料庫時發生錯誤：{e}")

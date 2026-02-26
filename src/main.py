@@ -98,14 +98,14 @@ def main():
         # 定義行情儲存變數
         latest_quote = {}
 
-        # KLineMaker 初始化 (5分K & 60分K)
-        maker_5m = KLineMaker(timeframe=5)
+        # KLineMaker 初始化 (60分K & 1D K線)
         maker_60m = KLineMaker(timeframe=60)
+        maker_1d = KLineMaker(timeframe=1440)
         
         # 策略初始化
         from src.strategies.dual_logic import DualTimeframeStrategy
         strategies = [
-            DualTimeframeStrategy(name="Gatekeeper-MXF-V1"),
+            DualTimeframeStrategy(name="Gatekeeper-MXF-V1", api=trader.api, contract=target_contract),
             # Future strategies can be added here
         ]
 
@@ -131,18 +131,18 @@ def main():
             # 判斷是否為 Tick 資料 (含有 close 和 volume)
             if 'close' in tick_data and 'volume' in tick_data:
                 try:
-                    # 同時餵給 5m 與 60m Maker
+                    # 同時餵給 60m 與 1d Maker
+                    is_new_1d = maker_1d.update_with_tick(tick_data)
                     is_new_60m = maker_60m.update_with_tick(tick_data)
-                    is_new_5m = maker_5m.update_with_tick(tick_data)
                     
-                    # 當 5m K 線完成時，進行策略判斷
-                    if is_new_5m:
-                        df_5m = maker_5m.get_dataframe()
+                    # 當 60m K 線完成時，進行策略判斷
+                    if is_new_60m:
                         df_60m = maker_60m.get_dataframe()
+                        df_1d = maker_1d.get_dataframe()
                         
                         # 呼叫策略檢查訊號
                         for strategy in strategies:
-                            strategy.check_signals(df_5m, df_60m)
+                            strategy.check_signals(df_60m, df_1d)
                         
                 except Exception as e:
                     print(f"Error in on_quote strategy logic: {e}")

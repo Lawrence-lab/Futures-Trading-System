@@ -33,8 +33,12 @@ class KLineMaker:
         # 1. 解析時間與價格
         try:
             ts = tick_data.get('datetime')
-            price = tick_data.get('close')
-            volume = tick_data.get('volume')
+            raw_price = tick_data.get('close')
+            raw_volume = tick_data.get('volume')
+            
+            # Cast to native float/int to avoid Decimal operand errors downstream
+            price = float(raw_price) if raw_price is not None else None
+            volume = int(raw_volume) if raw_volume is not None else None
             
             if ts is None or price is None:
                 return False

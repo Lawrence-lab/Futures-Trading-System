@@ -86,7 +86,7 @@ def main():
     df_1m.rename(columns={'ts': 'datetime'}, inplace=True)
     df_1m.set_index('datetime', inplace=True)
     
-    # 4. Resample to 5m and 60m
+    # 4. Resample to 60m and 1D
     print("Resampling data...")
     ohlc_dict = {
         'open': 'first',
@@ -96,15 +96,15 @@ def main():
         'volume': 'sum'
     }
     
-    df_5m = df_1m.resample('5min', label='left', closed='left').apply(ohlc_dict).dropna()
     df_60m = df_1m.resample('60min', label='left', closed='left').apply(ohlc_dict).dropna()
+    df_1d = df_1m.resample('1D', label='left', closed='left').apply(ohlc_dict).dropna()
     
     # Reset index to make datetime a column again for strategy access if needed
-    df_5m.reset_index(inplace=True)
     df_60m.reset_index(inplace=True)
+    df_1d.reset_index(inplace=True)
     
-    print(f"5m Bars: {len(df_5m)}")
     print(f"60m Bars: {len(df_60m)}")
+    print(f"1D Bars: {len(df_1d)}")
     
     # 4.5 Pre-calculate Indicators (O(N) Optimization)
     print("Pre-calculating indicators...")
@@ -204,14 +204,14 @@ def main():
         return pd.Series(signal, index=df.index)
 
     # Calculate
-    st_series = get_supertrend_series(df_60m)
-    df_60m['is_uptrend'] = st_series
+    st_series = get_supertrend_series(df_1d)
+    df_1d['is_uptrend'] = st_series
     
-    ut_series = get_ut_bot_series(df_5m, key_value=3.5) # Optimized Parameter
-    df_5m['signal'] = ut_series
+    ut_series = get_ut_bot_series(df_60m, key_value=3.5) # Optimized Parameter
+    df_60m['signal'] = ut_series
     
-    # Pre-calc ATR for 5m
-    df_5m['atr'] = calculate_atr(df_5m)
+    # Pre-calc ATR for 60m
+    df_60m['atr'] = calculate_atr(df_60m)
 
     # 5. Simulation Loop
     print("Running simulation...")
@@ -219,35 +219,35 @@ def main():
     # from src.strategies.rubber_band import RubberBandStrategy
     # strategy = RubberBandStrategy(name="RubberBand_V1_Backtest")
     
-    # Pre-calculate 60m indices
-    times_60m = df_60m['datetime'].values
+    # Pre-calculate 1d indices
+    times_1d = df_1d['datetime'].values
     
-    print(f"Total steps: {len(df_5m)}")
+    print(f"Total steps: {len(df_60m)}")
     
-    for i in range(len(df_5m)):
+    for i in range(len(df_60m)):
         if i % 1000 == 0:
-            print(f"Step {i}/{len(df_5m)}...", end='\r')
+            print(f"Step {i}/{len(df_60m)}...", end='\r')
             
         # Get pre-calculated values
-        # Signal 5m
-        sig_5m = df_5m['signal'].iloc[i]
+        # Signal 60m
+        sig_60m = df_60m['signal'].iloc[i]
         
-        # Find 60m index
-        current_5m_bar_time = df_5m.iloc[i]['datetime']
+        # Find 1d index
+        current_60m_bar_time = df_60m.iloc[i]['datetime']
         
         # Type compatibility check not needed if we ensure both are datetime64 or Timestamp.
-        # df_5m['datetime'] and df_60m['datetime'] came from resample, likely timestamps.
+        # df_60m['datetime'] and df_1d['datetime'] came from resample, likely timestamps.
         # numpy array might be datetime64[ns].
         
-        if isinstance(current_5m_bar_time, pd.Timestamp):
-             target_time = current_5m_bar_time.to_datetime64()
+        if isinstance(current_60m_bar_time, pd.Timestamp):
+             target_time = current_60m_bar_time.to_datetime64()
         else:
-             target_time = current_5m_bar_time
+             target_time = current_60m_bar_time
 
-        idx = np.searchsorted(times_60m, target_time, side='left')
+        idx = np.searchsorted(times_1d, target_time, side='left')
         
         if idx == 0:
-            is_bull_60m = False # Default or skip
+            is_bull_1d = False # Default or skip
         else:
             # We want the status of the *completed* 60m bar relevant to now.
             # If current time is 10:05. idx points to 10:00 (starts at 10:00).
@@ -300,28 +300,24 @@ def main():
             # We want row where (Start + 1h) <= CurrentTime.
             # Start <= CurrentTime - 1h.
             
-            prev_1h = target_time - np.timedelta64(60, 'm')
-            idx_safe = np.searchsorted(times_60m, prev_1h, side='right') - 1
-            # searchsorted right on 09:00 (target-1h if target=10:00) -> returns index after 09:00 (i.e. 10:00 index, so -1 gives 09:00).
-            # If target 10:05. prev_1h = 09:05.
-            # searchsorted([09:00, 10:00], 09:05, right) -> index of 10:00.
-            # -1 -> 09:00. Correct.
+            prev_1d = target_time - np.timedelta64(1440, 'm')
+            idx_safe = np.searchsorted(times_1d, prev_1d, side='right') - 1
             
             if idx_safe < 0:
-                is_bull_60m = False
+                is_bull_1d = False
             else:
-                 is_bull_60m = df_60m['is_uptrend'].iloc[idx_safe]
+                 is_bull_1d = df_1d['is_uptrend'].iloc[idx_safe]
 
         # Prepare inputs for DualTimeframeStrategy
         # Passing single-row DF for correctness with current DualLogic implementation
-        df_5m_row = df_5m.iloc[[i]]
-        df_60m_dummy = df_60m.iloc[[0]] 
+        df_60m_row = df_60m.iloc[[i]]
+        df_1d_dummy = df_1d.iloc[[0]] 
         
         strategy.check_signals(
-            df_5m_row, 
-            df_60m_dummy, 
-            precalc_bullish_60m=is_bull_60m, 
-            precalc_signal_5m=sig_5m
+            df_60m_row, 
+            df_1d_dummy, 
+            precalc_bullish_1d=is_bull_1d, 
+            precalc_signal_60m=sig_60m
         )
         
     print(f"\nSimulation complete.")

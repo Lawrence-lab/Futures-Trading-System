@@ -1,0 +1,86 @@
+﻿Configuration loaded successfully.
+Simulation Mode: False
+Cert Path: certs/Sinopac.pfx
+Initializing Backtest...
+Response Code: 0 | Event Code: 0 | Info: host '210.59.255.161:80', hostname '210.59.255.161:80' IP 210.59.255.161:80 (host 1 of 1) (host connection attempt 1 of 1) (total connection attempt 1 of 1) | Event: Session up
+SecurityType.Index 合約載入完成。
+SecurityType.Stock 合約載入完成。
+SecurityType.Future 合約載入完成。
+SecurityType.Option 合約載入完成。
+登入與 CA 憑證啟用成功。
+Login successful.
+Finding TMF (Micro TAIEX) contract...
+Target Contract: 微型臺指期貨03 (TMFC6)
+Fetching historical data (Last 180 days)...
+Response Code: 200 | Event Code: 16 | Info: APISUB/V1/SYS/CONTRACT | Event: Subscribe or Unsubscribe ok
+Fetched 51758 1-minute bars.
+Resampling data...
+5m Bars: 17864
+60m Bars: 2300
+Pre-calculating indicators...
+Running simulation...
+Total steps: 17864
+Step 0/17864...
+Step 1000/17864...
+Step 2000/17864...
+Step 3000/17864...
+Step 4000/17864...
+Step 5000/17864...
+Step 6000/17864...
+Step 7000/17864...
+Step 8000/17864...
+Step 9000/17864...
+Step 10000/17864...
+Step 11000/17864...
+Step 12000/17864...
+Step 13000/17864...
+Step 14000/17864...
+Step 15000/17864...
+Step 16000/17864...
+Step 17000/17864...
+
+Simulation complete.
+--------------------------------------------------
+Backtest Results
+--------------------------------------------------
+Total Trades: 34
+Win Rate: 38.24% (13 Wins / 21 Losses)
+Total PnL (Points): 494.00
+Avg PnL per Trade: 14.53
+
+Trade Details:
+                      strategy          entry_time           exit_time  entry_price  exit_price         reason    pnl
+0   Gatekeeper-MXF-V1_Backtest 2025-09-26 09:00:00 2025-09-26 09:40:00      25870.0     25660.0  Trailing Stop  210.0
+1   Gatekeeper-MXF-V1_Backtest 2025-10-01 09:00:00 2025-10-01 10:00:00      26098.0     26250.0  Trailing Stop  152.0
+2   Gatekeeper-MXF-V1_Backtest 2025-10-15 08:45:00 2025-10-15 09:05:00      27000.0     26900.0      Stop Loss -100.0
+3   Gatekeeper-MXF-V1_Backtest 2025-10-17 21:40:00 2025-10-17 21:50:00      27350.0     27460.0      Stop Loss -110.0
+4   Gatekeeper-MXF-V1_Backtest 2025-10-22 22:25:00 2025-10-22 22:55:00      27580.0     27589.0     Break Even   -9.0
+5   Gatekeeper-MXF-V1_Backtest 2025-10-23 08:45:00 2025-10-23 08:50:00      27356.0     27430.0      Stop Loss  -74.0
+6   Gatekeeper-MXF-V1_Backtest 2025-11-04 09:20:00 2025-11-04 09:45:00      28610.0     28510.0      Stop Loss -100.0
+7   Gatekeeper-MXF-V1_Backtest 2025-11-13 08:45:00 2025-11-13 09:40:00      27940.0     27972.0     Break Even  -32.0
+8   Gatekeeper-MXF-V1_Backtest 2025-11-17 22:30:00 2025-11-17 23:00:00      27361.0     27460.0  Trailing Stop   99.0
+9   Gatekeeper-MXF-V1_Backtest 2025-11-18 09:25:00 2025-11-18 09:45:00      27073.0     27253.0      Stop Loss -180.0
+10  Gatekeeper-MXF-V1_Backtest 2025-11-18 23:00:00 2025-11-18 23:20:00      26782.0     26901.0      Stop Loss -119.0
+11  Gatekeeper-MXF-V1_Backtest 2025-11-21 15:45:00 2025-11-21 16:05:00      26402.0     26490.0      Stop Loss  -88.0
+12  Gatekeeper-MXF-V1_Backtest 2025-11-24 17:25:00 2025-11-24 20:30:00      26538.0     26611.0      Stop Loss  -73.0
+13  Gatekeeper-MXF-V1_Backtest 2025-12-19 11:25:00 2025-12-19 12:20:00      28030.0     27969.0      Stop Loss  -61.0
+14  Gatekeeper-MXF-V1_Backtest 2025-12-22 08:45:00 2025-12-22 09:10:00      28344.0     28292.0      Stop Loss  -52.0
+15  Gatekeeper-MXF-V1_Backtest 2026-01-08 15:20:00 2026-01-08 22:40:00      30666.0     30650.0     Break Even  -16.0
+16  Gatekeeper-MXF-V1_Backtest 2026-01-09 09:45:00 2026-01-09 10:25:00      30445.0     30536.0  Trailing Stop   91.0
+17  Gatekeeper-MXF-V1_Backtest 2026-01-09 22:35:00 2026-01-09 23:05:00      30791.0     30680.0      Stop Loss -111.0
+18  Gatekeeper-MXF-V1_Backtest 2026-01-12 22:35:00 2026-01-13 00:30:00      30952.0     31130.0  Trailing Stop  178.0
+19  Gatekeeper-MXF-V1_Backtest 2026-01-13 08:45:00 2026-01-13 08:55:00      31355.0     31289.0      Stop Loss  -66.0
+20  Gatekeeper-MXF-V1_Backtest 2026-01-13 23:00:00 2026-01-13 23:55:00      31093.0     31191.0      Stop Loss  -98.0
+21  Gatekeeper-MXF-V1_Backtest 2026-01-22 03:25:00 2026-01-22 03:50:00      31838.0     31966.0  Trailing Stop  128.0
+22  Gatekeeper-MXF-V1_Backtest 2026-01-29 22:50:00 2026-01-29 23:45:00      32559.0     32199.0  Trailing Stop  360.0
+23  Gatekeeper-MXF-V1_Backtest 2026-01-30 09:20:00 2026-01-30 10:05:00      32395.0     32308.0  Trailing Stop   87.0
+24  Gatekeeper-MXF-V1_Backtest 2026-01-31 00:10:00 2026-01-31 00:25:00      32107.0     32016.0  Trailing Stop   91.0
+25  Gatekeeper-MXF-V1_Backtest 2026-02-03 08:45:00 2026-02-03 08:55:00      32454.0     32365.0      Stop Loss  -89.0
+26  Gatekeeper-MXF-V1_Backtest 2026-02-05 11:25:00 2026-02-05 15:00:00      31901.0     32045.0      Stop Loss -144.0
+27  Gatekeeper-MXF-V1_Backtest 2026-02-06 02:50:00 2026-02-06 03:05:00      31810.0     31915.0      Stop Loss -105.0
+28  Gatekeeper-MXF-V1_Backtest 2026-02-11 21:30:00 2026-02-11 22:55:00      33897.0     34060.0  Trailing Stop  163.0
+29  Gatekeeper-MXF-V1_Backtest 2026-02-23 09:40:00 2026-02-23 10:10:00      34442.0     34206.0      Stop Loss -236.0
+30  Gatekeeper-MXF-V1_Backtest 2026-02-23 15:00:00 2026-02-23 17:15:00      34070.0     34172.0  Trailing Stop  102.0
+31  Gatekeeper-MXF-V1_Backtest 2026-02-24 08:45:00 2026-02-24 09:55:00      34175.0     34522.0  Trailing Stop  347.0
+32  Gatekeeper-MXF-V1_Backtest 2026-02-25 09:45:00 2026-02-25 11:00:00      35364.0     35717.0  Trailing Stop  353.0
+33  Gatekeeper-MXF-V1_Backtest 2026-02-26 10:25:00 2026-02-26 11:45:00      35641.0     35637.0     Break Even   -4.0
