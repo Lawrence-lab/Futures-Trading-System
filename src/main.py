@@ -161,6 +161,26 @@ def main():
         print("開始接收行情 (每 1 分鐘更新監控日誌)...")
         print("-" * 50)
         
+        # --- 初始化取得最新權益數 ---
+        try:
+            acc = trader.api.futopt_account
+            if acc:
+                margin_res = trader.api.margin(acc)
+                if margin_res:
+                    margin_data = margin_res[0] if isinstance(margin_res, list) and len(margin_res) > 0 else margin_res
+                    t_equity = getattr(margin_data, 'equity', 0.0) 
+                    if not t_equity and isinstance(margin_data, dict):
+                        t_equity = margin_data.get('equity', 0.0)
+                    a_margin = getattr(margin_data, 'available_margin', 0.0)
+                    if not a_margin and isinstance(margin_data, dict):
+                        a_margin = margin_data.get('available_margin', 0.0)
+                    init_date = time.strftime("%Y-%m-%d", time.localtime())
+                    log_daily_equity(init_date, total_equity=float(t_equity), available_margin=float(a_margin))
+                    print(f"✅ 已將初始權益數 ({t_equity}) 記錄至資料庫。")
+        except Exception as e:
+            print(f"⚠️ 取得初始權益數或寫入資料庫失敗: {e}")
+        # -----------------------------
+        
         notified_open = False
         notified_close = False
         last_date = ""
@@ -224,7 +244,7 @@ def main():
                             # 注意: Shioaji 取得帳務資訊可能會需要憑證與簽章
                             # 這裡使用 trader.api.account_balance 取得保證金資訊 (如果是期貨)
                             # 由於微型台指是期貨，我們需要呼叫期貨保證金查詢
-                            acc = trader.api.handle_active_account
+                            acc = trader.api.futopt_account
                             if acc:
                                 margin_res = trader.api.margin(acc)
                                 if margin_res:

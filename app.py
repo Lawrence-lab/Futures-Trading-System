@@ -58,7 +58,7 @@ try:
     col1.metric("📌 當前倉位", pos_text)
     
     # 權益總額處理
-    eq_val = f"{latest_equity[0]:,.0f}" if latest_equity and latest_equity[0] else "N/A"
+    eq_val = f"{latest_equity[0]:,.0f}" if latest_equity and latest_equity[0] is not None else "N/A"
     col2.metric("💰 權益總額", eq_val)
     
     # 本週點數損益處理
