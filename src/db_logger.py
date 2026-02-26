@@ -95,21 +95,33 @@ try:
     import streamlit as st
 
     @st.cache_resource(ttl=3600) # 快取有效時間設定 (例如 1 小時)
-    def get_streamlit_db_connection():
-        """
-        取得供 Streamlit 儀表板使用的快取 PostgreSQL 連線。
-        (請勿在背景任務中使用此連線，且避免手動 conn.close())
-        """
+    def _create_streamlit_db_connection():
         db_url = os.environ.get("DATABASE_URL")
         if not db_url:
             st.error("❌ DATABASE_URL is not set.")
             return None
-            
         try:
             return psycopg2.connect(db_url)
         except Exception as e:
             st.error(f"❌ Streamlit DB Connection failed: {e}")
             return None
+
+    def get_streamlit_db_connection():
+        """
+        取得供 Streamlit 儀表板使用的 PostgreSQL 連線。
+        內建防斷線機制，若連線已關閉則自動清除快取並重新連線。
+        """
+        conn = _create_streamlit_db_connection()
+        if conn is not None:
+            try:
+                # 測試連線是否存活
+                with conn.cursor() as cursor:
+                    cursor.execute("SELECT 1")
+            except (psycopg2.OperationalError, psycopg2.InterfaceError):
+                # 如果連線已經斷開，清除快取並重新建立
+                st.cache_resource.clear()
+                conn = _create_streamlit_db_connection()
+        return conn
             
 except ImportError:
     # 執行主程式時如果沒有 import streamlit 也不會報錯
