@@ -288,11 +288,17 @@ def main():
                     # Handle undefined variables conditionally
                     days_left = "N/A" 
                     trend_status = "N/A"
-                    print(f"[{current_time}] [Monitor] Expiry: {days_left}d | 60M: {trend_status} | 5M Price: {price}")
+                    print(f"[{current_time}] [Monitor] Expiry: {days_left}d | 1D: {trend_status} | 60M Price: {price}")
                     
                     # Print status for each strategy
                     for strategy in strategies:
-                        pos_status = "LONG" if strategy.is_long else "EMPTY"
+                        if strategy.is_long:
+                            pos_status = "LONG"
+                        elif getattr(strategy, 'is_short', False):
+                            pos_status = "SHORT"
+                        else:
+                            pos_status = "EMPTY"
+                            
                         print(f"   -> [{strategy.name}] Position: {pos_status} | Entry: {strategy.entry_price}")
                     
                 else:
