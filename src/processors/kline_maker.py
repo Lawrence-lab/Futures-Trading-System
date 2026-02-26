@@ -132,3 +132,30 @@ class KLineMaker:
         
         df = pd.DataFrame(data)
         return df
+
+    def load_historical_dataframe(self, df: pd.DataFrame):
+        """
+        將歷史 DataFrame 直接轉換為內部 Bar 結構並載入
+        df 需包含 datetime, open, high, low, close, volume 欄位
+        """
+        if df.empty:
+            return
+            
+        for _, row in df.iterrows():
+            # 確保 time 欄位為 datetime object
+            ts = row['datetime']
+            if not isinstance(ts, datetime):
+                ts = pd.to_datetime(ts).to_pydatetime()
+                
+            bar = Bar(
+                time=ts,
+                open=float(row['open']),
+                high=float(row['high']),
+                low=float(row['low']),
+                close=float(row['close']),
+                volume=int(row['volume']) if pd.notna(row['volume']) else 0
+            )
+            self.bars.append(bar)
+        
+        # Optionally print completion
+        print(f"[KLine {self.timeframe}m] Preloaded {len(df)} historical bars.")

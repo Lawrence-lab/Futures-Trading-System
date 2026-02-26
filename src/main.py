@@ -4,6 +4,11 @@
 import sys
 import os
 
+# Ensure UTF-8 output on Windows
+if sys.stdout.encoding.lower() != 'utf-8':
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(encoding='utf-8')
+
 # Add project root to system path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -101,6 +106,43 @@ def main():
         # KLineMaker 初始化 (60分K & 1D K線)
         maker_60m = KLineMaker(timeframe=60)
         maker_1d = KLineMaker(timeframe=1440)
+        
+        # 預載歷史 K 線以解決冷啟動 (Cold-Start) 指標 N/A 問題
+        try:
+            from datetime import timedelta
+            import pandas as pd
+            
+            print("正在向永豐 API 調閱過去 14 天歷史 K 線以初始化指標...")
+            end_date = datetime.now().strftime("%Y-%m-%d")
+            start_date = (datetime.now() - timedelta(days=14)).strftime("%Y-%m-%d")
+            
+            kbars = trader.api.kbars(contract=target_contract, start=start_date, end=end_date)
+            
+            df_1m = pd.DataFrame({
+                'datetime': pd.to_datetime(kbars.ts),
+                'open': kbars.Open,
+                'high': kbars.High,
+                'low': kbars.Low,
+                'close': kbars.Close,
+                'volume': kbars.Volume
+            })
+            
+            if not df_1m.empty:
+                df_1m.set_index('datetime', inplace=True)
+                ohlc_dict = {
+                    'open': 'first', 'high': 'max', 'low': 'min', 'close': 'last', 'volume': 'sum'
+                }
+                
+                df_60m_hist = df_1m.resample('60min', label='left', closed='left').apply(ohlc_dict).dropna().reset_index()
+                df_1d_hist = df_1m.resample('1D', label='left', closed='left').apply(ohlc_dict).dropna().reset_index()
+                
+                maker_60m.load_historical_dataframe(df_60m_hist)
+                maker_1d.load_historical_dataframe(df_1d_hist)
+                print(f"歷史資料載入完畢: 60M ({len(df_60m_hist)} 根), 1D ({len(df_1d_hist)} 根)")
+            else:
+                print("⚠️ 永豐 API 未回傳歷史資料，系統將空手啟動收集 K 線。")
+        except Exception as e:
+            print(f"⚠️ 載入歷史資料失敗: {e}")
         
         # 策略初始化
         from src.strategies.dual_logic import DualTimeframeStrategy
