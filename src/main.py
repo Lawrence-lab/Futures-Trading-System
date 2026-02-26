@@ -181,19 +181,29 @@ def main():
             print(f"⚠️ 取得初始權益數或寫入資料庫失敗: {e}")
         # -----------------------------
         
+        from datetime import datetime
+        import pytz
+        tw_tz = pytz.timezone('Asia/Taipei')
+        
         notified_open = False
         notified_close = False
+        notified_night_open = False
+        notified_night_close = False
         last_date = ""
 
         while True:
             try:
-                current_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
-                current_date = time.strftime("%Y-%m-%d", time.localtime())
-                current_hm = time.strftime("%H:%M", time.localtime())
+                # Use Asia/Taipei timezone explicitly to avoid UTC offset issues on cloud servers
+                now_tw = datetime.now(tw_tz)
+                current_time = now_tw.strftime("%Y-%m-%d %H:%M:%S")
+                current_date = now_tw.strftime("%Y-%m-%d")
+                current_hm = now_tw.strftime("%H:%M")
                 
                 if current_date != last_date:
                     notified_open = False
                     notified_close = False
+                    notified_night_open = False
+                    notified_night_close = False
                     last_date = current_date
                 
                 if latest_quote:
@@ -201,6 +211,7 @@ def main():
                     price = latest_quote.get('close', latest_quote.get('price', 0))
                     
                     # === LINE Notify ===
+                    # 日盤開盤 (08:45)
                     if current_hm == "08:46" and not notified_open:
                         df_5m = maker_5m.get_dataframe()
                         atr_val = "N/A"
@@ -212,10 +223,11 @@ def main():
                             if not atr_series.empty:
                                 atr_val = f"{atr_series.iloc[-1]:.2f}"
                                 
-                        msg_open = f"✅ 門神已就位！今日開盤價：{price}，ATR 波動率：{atr_val}，Body Filter 閾值已鎖定。"
+                        msg_open = f"☀️ [日盤] 門神已就位！今日開盤價：{price}，ATR 波動率：{atr_val}，Body Filter 閾值已鎖定。"
                         send_line_push_message(msg_open)
                         notified_open = True
-                        
+                    
+                    # 日盤收盤 (13:45)
                     if current_hm == "13:46" and not notified_close:
                         pos_status_list = []
                         total_pnl = 0.0
@@ -234,28 +246,20 @@ def main():
                                 pos_status_list[-1] += f" (未平倉損益: {floating_pnl:.1f})"
                                 
                         pos_status_str = " | ".join(pos_status_list) if pos_status_list else "無"
-                        msg_close = f"📊 今日任務結束。\n狀態：{pos_status_str}\n本日盈虧：{total_pnl:.1f} 點。"
+                        msg_close = f"📊 [日盤] 今日任務結束。\n狀態：{pos_status_str}\n本日盈虧：{total_pnl:.1f} 點。"
                         send_line_push_message(msg_close)
                         notified_close = True
                         
                         # --- Log Daily Equity to PostgreSQL ---
                         try:
-                            # 取得這帳戶的權益數
-                            # 注意: Shioaji 取得帳務資訊可能會需要憑證與簽章
-                            # 這裡使用 trader.api.account_balance 取得保證金資訊 (如果是期貨)
-                            # 由於微型台指是期貨，我們需要呼叫期貨保證金查詢
                             acc = trader.api.futopt_account
                             if acc:
                                 margin_res = trader.api.margin(acc)
                                 if margin_res:
-                                    # margin_res 通常是 list of dict
                                     margin_data = margin_res[0] if isinstance(margin_res, list) and len(margin_res) > 0 else margin_res
-                                    
-                                    # 嘗試從 Margin 物件或字典中取值
                                     t_equity = getattr(margin_data, 'equity', 0.0) 
                                     if not t_equity and isinstance(margin_data, dict):
                                         t_equity = margin_data.get('equity', 0.0)
-                                        
                                     a_margin = getattr(margin_data, 'available_margin', 0.0)
                                     if not a_margin and isinstance(margin_data, dict):
                                         a_margin = margin_data.get('available_margin', 0.0)
@@ -265,6 +269,20 @@ def main():
                         except Exception as e:
                             print(f"取得權益數或寫入資料庫失敗: {e}")
                         # --------------------------------------
+                    
+                    # 夜盤開盤 (15:00)
+                    if current_hm == "15:01" and not notified_night_open:
+                        msg_night_open = f"🌙 [夜盤] 門神已就位！夜盤開盤價：{price}，系統持續監控中。"
+                        send_line_push_message(msg_night_open)
+                        notified_night_open = True
+                        
+                    # 夜盤收盤 (05:00)
+                    if current_hm == "05:01" and not notified_night_close:
+                        # Optional: Add night session PnL summary here if needed
+                        msg_night_close = f"💤 [夜盤] 任務結束。狀態更新完畢，準備迎接日盤。"
+                        send_line_push_message(msg_night_close)
+                        notified_night_close = True
+                        
                     # ===================
                     
                     # Handle undefined variables conditionally
