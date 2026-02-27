@@ -18,6 +18,9 @@ from src.strategies.dual_logic import DualTimeframeStrategy
 from src.portfolio_manager import PortfolioManager
 import logging
 
+# Disable Line notifications during backtest to prevent spam
+os.environ["DISABLE_LINE_NOTIFY"] = "true"
+
 # Configure logging to show strategy output
 logging.basicConfig(
     level=logging.INFO,
@@ -217,9 +220,13 @@ def main():
     # 5. Simulation Loop
     print("Running simulation...")
     portfolio = PortfolioManager(api=trader.api)
-    strategy = DualTimeframeStrategy(name="Gatekeeper-MXF-V1_Backtest", portfolio=portfolio, contract=target_contract)
-    # from src.strategies.rubber_band import RubberBandStrategy
-    # strategy = RubberBandStrategy(name="RubberBand_V1_Backtest")
+    
+    from src.strategies.gatekeeper_bnf_b import GatekeeperBNFBStrategy
+    
+    strategies = [
+        DualTimeframeStrategy(name="Gatekeeper-MXF-V1_Backtest", portfolio=portfolio, contract=target_contract),
+        GatekeeperBNFBStrategy(name="Gatekeeper-BNF-B_Backtest", portfolio=portfolio, contract=target_contract)
+    ]
     
     # Pre-calculate 1d indices
     times_1d = df_1d['datetime'].values
@@ -310,17 +317,18 @@ def main():
             else:
                  is_bull_1d = df_1d['is_uptrend'].iloc[idx_safe]
 
-        # Prepare inputs for DualTimeframeStrategy
-        # Passing single-row DF for correctness with current DualLogic implementation
-        df_60m_row = df_60m.iloc[[i]]
+        # Prepare inputs for strategies
+        # Pass a rolling window of 100 bars so strategies can calculate dynamic indicators like SMA, ATR, etc.
+        df_60m_window = df_60m.iloc[max(0, i-100):i+1]
         df_1d_dummy = df_1d.iloc[[0]] 
         
-        strategy.check_signals(
-            df_60m_row, 
-            df_1d_dummy, 
-            precalc_bullish_1d=is_bull_1d, 
-            precalc_signal_60m=sig_60m
-        )
+        for strategy in strategies:
+            strategy.check_signals(
+                df_60m_window, 
+                df_1d_dummy, 
+                precalc_bullish_1d=is_bull_1d, 
+                precalc_signal_60m=sig_60m
+            )
         
     print(f"\nSimulation complete.")
         
@@ -329,7 +337,14 @@ def main():
     print("Backtest Results")
     print("-" * 50)
     
-    trades = strategy.trades
+    trades = []
+    for strategy in strategies:
+        trades.extend(strategy.trades)
+        
+    # Sort combined trades
+    if trades:
+        trades.sort(key=lambda x: x['exit_time'])
+        
     total_trades = len(trades)
     
     if total_trades == 0:

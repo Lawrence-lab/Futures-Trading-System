@@ -6,6 +6,10 @@ def send_line_push_message(message: str):
     發送 LINE Push Message 到指定的 User ID。
     需確保環境變數中設定了 LINE_CHANNEL_ACCESS_TOKEN 與 LINE_USER_ID。
     """
+    # Check global kill switch
+    if os.environ.get("DISABLE_LINE_NOTIFY", "").lower() == "true":
+        return
+
     # 從環境變數讀取 Token 和 User ID
     token = os.environ.get("LINE_CHANNEL_ACCESS_TOKEN")
     user_id = os.environ.get("LINE_USER_ID")
