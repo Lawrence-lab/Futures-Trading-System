@@ -362,7 +362,8 @@ def main():
                     
                 else:
                     # Dashboard Output (No Tick State)
-                    current_time_str = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
+                    tw_tz_now = datetime.now(tw_tz)
+                    current_time_str = tw_tz_now.strftime('%Y-%m-%d %H:%M:%S')
                     trend_status = "N/A"
                     try:
                         df_1d = maker_1d.get_dataframe()
