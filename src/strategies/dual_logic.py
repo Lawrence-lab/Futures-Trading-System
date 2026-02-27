@@ -31,8 +31,8 @@ class DualTimeframeStrategy:
         
         # Parameters
         self.be_threshold = 150.0  # 保本觸發點 (Optimized: 150)
-        self.trailing_stop_drop = 100.0 # 折返停利點
-        self.ut_bot_key = 3.5 # UT Bot Sensitivity (Optimized: 3.5)
+        self.trailing_stop_drop = 200.0 # 折返停利點 (Optimized from backtest sweep)
+        self.ut_bot_key = 4.0 # UT Bot Sensitivity (Optimized from backtest sweep)
         self.body_filter = 100.0 # Candle Body Filter (Optimized: 100)
 
     def check_signals(self, df_60m, df_1d, precalc_bullish_1d=None, precalc_signal_60m=None):

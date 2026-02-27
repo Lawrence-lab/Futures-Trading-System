@@ -147,14 +147,14 @@ def main():
         
         # 策略初始化
         from src.strategies.dual_logic import DualTimeframeStrategy
+        from src.strategies.gatekeeper_bnf_b import GatekeeperBNFBStrategy
         
         # 建立投資組合管理員
         portfolio = PortfolioManager(api=trader.api)
         
         strategies = [
             DualTimeframeStrategy(name="Gatekeeper-MXF-V1", portfolio=portfolio, contract=target_contract),
-            # 未來的新策略可以同樣傳入 portfolio 實例
-            # DualTimeframeStrategy(name="Gatekeeper-MXF-V2", portfolio=portfolio, contract=target_contract),
+            GatekeeperBNFBStrategy(name="Gatekeeper-BNF-B", portfolio=portfolio, contract=target_contract),
         ]
 
         # 定義行情 Callback

@@ -137,7 +137,32 @@ def calculate_adx(df, period=14):
     dx = 100 * (diff_di / sum_di.replace(0, np.nan))
     dx = dx.fillna(0)
     
-    # 5. Calculate ADX (Smooth DX)
     adx = dx.ewm(alpha=alpha, adjust=False).mean()
     
     return adx
+
+def calculate_sma(df, period=60, column='close'):
+    """
+    Calculate Simple Moving Average (SMA).
+    Returns: sma (Series)
+    """
+    if len(df) < period:
+        return None
+    return df[column].rolling(window=period).mean()
+
+def calculate_bias(df, sma_col=None, period=60, price_col='close'):
+    """
+    Calculate Bias Ratio (乖離率).
+    Bias = (Current Price - SMA) / SMA * 100%
+    If sma_col is not provided, it calculates SMA on the fly.
+    Returns: bias (Series) in percentage (e.g., -1.5 for -1.5%)
+    """
+    if len(df) < period:
+        return None
+        
+    sma = df[sma_col] if sma_col and sma_col in df.columns else calculate_sma(df, period, price_col)
+    if sma is None:
+        return None
+        
+    bias = (df[price_col] - sma) / sma * 100.0
+    return bias

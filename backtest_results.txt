@@ -1,5 +1,5 @@
 Configuration loaded successfully.
-Simulation Mode: True
+Simulation Mode: False
 Cert Path: certs/Sinopac.pfx
 Initializing Backtest...
 Response Code: 0 | Event Code: 0 | Info: host '210.59.255.161:80', hostname '210.59.255.161:80' IP 210.59.255.161:80 (host 1 of 1) (host connection attempt 1 of 1) (total connection attempt 1 of 1) | Event: Session up
@@ -9,34 +9,58 @@ SecurityType.Future 合約載入完成。
 SecurityType.Option 合約載入完成。
 登入與 CA 憑證啟用成功。
 Login successful.
-Finding MXF contract...
-Target Contract: 小型臺指02 (MXFB6)
+Finding TMF (Micro TAIEX) contract...
+Target Contract: 微型臺指期貨03 (TMFC6)
 Fetching historical data (Last 180 days)...
-Fetched 44193 1-minute bars.
+Fetched 52025 1-minute bars.
 Resampling data...
-5m Bars: 11279
-60m Bars: 1199
+60m Bars: 2305
+1D Bars: 143
 Pre-calculating indicators...
 Running simulation...
-Total steps: 11279
-Step 0/11279...Step 1000/11279...Step 2000/11279...Step 3000/11279...Step 4000/11279...Step 5000/11279...Step 6000/11279...Step 7000/11279...Step 8000/11279...Step 9000/11279...Step 10000/11279...Step 11000/11279...
+Total steps: 2305
+Step 0/2305...Step 1000/2305...Step 2000/2305...
 Simulation complete.
 --------------------------------------------------
 Backtest Results
 --------------------------------------------------
-Total Trades: 9
-Win Rate: 55.56% (5 Wins / 4 Losses)
-Total PnL (Points): 328.00
-Avg PnL per Trade: 36.44
+Total Trades: 33
+Win Rate: 42.42% (14 Wins / 19 Losses)
+Total PnL (Points): 3174.00
+Avg PnL per Trade: 96.18
 
 Trade Details:
-           entry_time           exit_time  entry_price  exit_price         reason    pnl
-0 2025-12-19 11:25:00 2025-12-19 12:25:00      28010.0     27915.0      Stop Loss  -95.0
-1 2026-01-08 15:20:00 2026-01-08 23:00:00      30612.0     30510.0      Stop Loss -102.0
-2 2026-01-12 22:35:00 2026-01-13 01:15:00      30898.0     31109.0  Trailing Stop  211.0
-3 2026-01-22 03:25:00 2026-01-22 04:00:00      31786.0     31926.0  Trailing Stop  140.0
-4 2026-01-23 08:45:00 2026-01-23 09:20:00      32063.0     32016.0      Stop Loss  -47.0
-5 2026-02-03 08:45:00 2026-02-03 08:55:00      32418.0     32318.0      Stop Loss -100.0
-6 2026-02-09 22:35:00 2026-02-09 22:50:00      32638.0     32786.0  Trailing Stop  148.0
-7 2026-02-11 09:00:00 2026-02-11 09:50:00      33398.0     33495.0  Trailing Stop   97.0
-8 2026-02-11 21:30:00 2026-02-11 22:20:00      33751.0     33827.0  Trailing Stop   76.0
+                      strategy          entry_time           exit_time  entry_price  exit_price                       reason    pnl
+0   Gatekeeper-MXF-V1_Backtest 2025-09-16 09:00:00 2025-09-17 16:00:00      25452.0     25360.0                    Stop Loss  -92.0
+1   Gatekeeper-MXF-V1_Backtest 2025-09-22 10:00:00 2025-09-24 01:00:00      25832.0     26265.0                Trailing Stop  433.0
+2    Gatekeeper-BNF-B_Backtest 2025-09-26 09:00:00 2025-09-30 08:00:00      25545.0     25880.0       Time Stop (Max 3 Days)  335.0
+3   Gatekeeper-MXF-V1_Backtest 2025-09-30 08:00:00 2025-10-01 10:00:00      25880.0     26070.0                Trailing Stop  190.0
+4   Gatekeeper-MXF-V1_Backtest 2025-10-08 21:00:00 2025-10-09 21:00:00      27290.0     27250.0                   Break Even  -40.0
+5    Gatekeeper-BNF-B_Backtest 2025-10-13 08:00:00 2025-10-13 23:00:00      26680.0     27244.0  Mean Reversion (Touch 60MA)  564.0
+6   Gatekeeper-MXF-V1_Backtest 2025-10-13 21:00:00 2025-10-14 12:00:00      27137.0     26952.0                   Break Even -185.0
+7    Gatekeeper-BNF-B_Backtest 2025-10-14 18:00:00 2025-10-15 04:00:00      26600.0     26820.0      Stop Loss/Trailing Stop  220.0
+8   Gatekeeper-MXF-V1_Backtest 2025-10-20 08:00:00 2025-10-21 03:00:00      27603.0     27830.0                Trailing Stop  227.0
+9   Gatekeeper-MXF-V1_Backtest 2025-10-23 21:00:00 2025-10-27 09:00:00      27721.0     28156.0                Trailing Stop  435.0
+10   Gatekeeper-BNF-B_Backtest 2025-11-05 08:00:00 2025-11-05 09:00:00      27765.0     27572.0      Stop Loss/Trailing Stop -193.0
+11   Gatekeeper-BNF-B_Backtest 2025-11-07 22:00:00 2025-11-07 23:00:00      27527.0     27370.0      Stop Loss/Trailing Stop -157.0
+12   Gatekeeper-BNF-B_Backtest 2025-11-08 00:00:00 2025-11-10 08:00:00      27240.0     27927.0  Mean Reversion (Touch 60MA)  687.0
+13  Gatekeeper-MXF-V1_Backtest 2025-11-11 13:00:00 2025-11-12 13:00:00      27850.0     28070.0                    Stop Loss -220.0
+14  Gatekeeper-MXF-V1_Backtest 2025-11-13 08:00:00 2025-11-14 10:00:00      27908.0     27620.0                Trailing Stop  288.0
+15   Gatekeeper-BNF-B_Backtest 2025-11-14 19:00:00 2025-11-14 21:00:00      27187.0     27070.0      Stop Loss/Trailing Stop -117.0
+16   Gatekeeper-BNF-B_Backtest 2025-11-18 10:00:00 2025-11-18 15:00:00      26941.0     26833.0      Stop Loss/Trailing Stop -108.0
+17  Gatekeeper-MXF-V1_Backtest 2025-11-18 03:00:00 2025-11-18 21:00:00      27100.0     26904.0                Trailing Stop  196.0
+18   Gatekeeper-BNF-B_Backtest 2025-11-19 09:00:00 2025-11-19 11:00:00      26785.0     26674.0      Stop Loss/Trailing Stop -111.0
+19   Gatekeeper-BNF-B_Backtest 2025-11-21 10:00:00 2025-11-21 15:00:00      26579.0     26382.0      Stop Loss/Trailing Stop -197.0
+20  Gatekeeper-MXF-V1_Backtest 2025-11-21 00:00:00 2025-11-21 16:00:00      27077.0     26570.0                Trailing Stop  507.0
+21  Gatekeeper-MXF-V1_Backtest 2025-12-03 22:00:00 2025-12-03 23:00:00      27674.0     27806.0                    Stop Loss -132.0
+22   Gatekeeper-BNF-B_Backtest 2025-12-16 08:00:00 2025-12-17 12:00:00      27710.0     27710.0      Stop Loss/Trailing Stop    0.0
+23  Gatekeeper-MXF-V1_Backtest 2026-01-20 10:00:00 2026-01-20 16:00:00      31857.0     31617.0                    Stop Loss -240.0
+24  Gatekeeper-MXF-V1_Backtest 2026-01-21 09:00:00 2026-01-21 11:00:00      31754.0     31478.0                    Stop Loss -276.0
+25   Gatekeeper-BNF-B_Backtest 2026-01-29 23:00:00 2026-01-30 09:00:00      32126.0     32263.0      Stop Loss/Trailing Stop  137.0
+26   Gatekeeper-BNF-B_Backtest 2026-01-30 15:00:00 2026-01-30 17:00:00      31970.0     31937.0      Stop Loss/Trailing Stop  -33.0
+27   Gatekeeper-BNF-B_Backtest 2026-01-31 00:00:00 2026-01-31 04:00:00      32061.0     31940.0      Stop Loss/Trailing Stop -121.0
+28   Gatekeeper-BNF-B_Backtest 2026-02-02 09:00:00 2026-02-03 00:00:00      31569.0     32280.0  Mean Reversion (Touch 60MA)  711.0
+29  Gatekeeper-MXF-V1_Backtest 2026-02-02 23:00:00 2026-02-03 11:00:00      32207.0     32189.0                   Break Even  -18.0
+30  Gatekeeper-MXF-V1_Backtest 2026-02-04 09:00:00 2026-02-04 22:00:00      32410.0     32402.0                   Break Even   -8.0
+31   Gatekeeper-BNF-B_Backtest 2026-02-05 20:00:00 2026-02-06 08:00:00      31642.0     31619.0      Stop Loss/Trailing Stop  -23.0
+32   Gatekeeper-BNF-B_Backtest 2026-02-06 09:00:00 2026-02-06 17:00:00      31610.0     32125.0  Mean Reversion (Touch 60MA)  515.0
