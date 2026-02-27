@@ -7,13 +7,18 @@ from src.db_logger import log_trade_entry, log_trade_exit
 import shioaji as sj
 
 class DualTimeframeStrategy:
-    def __init__(self, name="DualTimeframe", api=None, contract=None):
+    def __init__(self, name="DualTimeframe", portfolio=None, contract=None):
         self.name = name
-        self.api = api
+        self.portfolio = portfolio
         self.contract = contract
-        self.contract = contract
-        self.is_long = False
-        self.is_short = False
+        
+        # 1. 初始化狀態：向 PortfolioManager 查詢此策略當前的持倉狀態
+        initial_pos = 0
+        if self.portfolio and self.contract:
+            initial_pos = self.portfolio.get_virtual_position(self.name, self.contract.code)
+
+        self.is_long = initial_pos > 0
+        self.is_short = initial_pos < 0
         self.entry_price = 0.0
         self.entry_time = None
         self.highest_price = 0.0
@@ -100,21 +105,19 @@ class DualTimeframeStrategy:
                         entry_time=current_time
                     )
                     
-                    # Physical Order Execution
-                    if self.api and self.contract:
+                    # Virtual Position Update & Physical Order Routing via PortfolioManager
+                    if self.portfolio and self.contract:
                         try:
-                            order = self.api.Order(
-                                action=sj.constant.Action.Buy,
-                                price=0,
-                                quantity=1,
-                                price_type=sj.constant.FuturesPriceType.MWP,
-                                order_type=sj.constant.OrderType.ROD, 
-                                octype=sj.constant.FuturesOCType.Auto
+                            self.portfolio.set_virtual_position(
+                                strategy_name=self.name,
+                                contract_symbol=self.contract.code,
+                                new_position=1, # 1 for Long
+                                contract_obj=self.contract,
+                                average_cost=self.entry_price
                             )
-                            trade = self.api.place_order(self.contract, order)
-                            logging.info(f"[{self.name}] [ORDER] 實體買單已送出: {trade}")
+                            logging.info(f"[{self.name}] [ORDER] 虛擬買單紀錄成功，已委派 PortfolioManager 處理。")
                         except Exception as e:
-                            error_msg = f"❌ [{self.name}] [ERROR] 買單送出失敗: {e}"
+                            error_msg = f"❌ [{self.name}] [ERROR] 委派買單失敗: {e}"
                             logging.error(error_msg)
                             send_line_push_message(error_msg)
 
@@ -149,21 +152,19 @@ class DualTimeframeStrategy:
                         entry_time=current_time
                     )
                     
-                    # Physical Order Execution
-                    if self.api and self.contract:
+                    # Virtual Position Update & Physical Order Routing via PortfolioManager
+                    if self.portfolio and self.contract:
                         try:
-                            order = self.api.Order(
-                                action=sj.constant.Action.Sell,
-                                price=0,
-                                quantity=1,
-                                price_type=sj.constant.FuturesPriceType.MWP,
-                                order_type=sj.constant.OrderType.ROD, 
-                                octype=sj.constant.FuturesOCType.Auto
+                            self.portfolio.set_virtual_position(
+                                strategy_name=self.name,
+                                contract_symbol=self.contract.code,
+                                new_position=-1, # -1 for Short
+                                contract_obj=self.contract,
+                                average_cost=self.entry_price
                             )
-                            trade = self.api.place_order(self.contract, order)
-                            logging.info(f"[{self.name}] [ORDER] 實體賣單出擊: {trade}")
+                            logging.info(f"[{self.name}] [ORDER] 虛擬賣單紀錄成功，已委派 PortfolioManager 處理。")
                         except Exception as e:
-                            error_msg = f"❌ [{self.name}] [ERROR] 賣單送出失敗: {e}"
+                            error_msg = f"❌ [{self.name}] [ERROR] 委派賣單失敗: {e}"
                             logging.error(error_msg)
                             send_line_push_message(error_msg)
 
@@ -218,23 +219,22 @@ class DualTimeframeStrategy:
                     )
                     self.current_db_trade_id = -1
                     
-                    # 實體委託單送出 (Physical Order Execution)
-                    if self.api and self.contract:
+                    # Virtual Position Update & Physical Order Routing via PortfolioManager
+                    if self.portfolio and self.contract:
                         try:
-                            order = self.api.Order(
-                                action=sj.constant.Action.Sell, # 平倉賣出
-                                price=0, 
-                                quantity=1,
-                                price_type=sj.constant.FuturesPriceType.MWP,
-                                order_type=sj.constant.OrderType.ROD,
-                                octype=sj.constant.FuturesOCType.Auto
+                            # 平倉，虛擬部位歸 0
+                            self.portfolio.set_virtual_position(
+                                strategy_name=self.name,
+                                contract_symbol=self.contract.code,
+                                new_position=0, 
+                                contract_obj=self.contract,
+                                average_cost=0.0
                             )
-                            trade = self.api.place_order(self.contract, order)
-                            logging.info(f"[{self.name}] [ORDER] 實體賣單 (平多單) 已送出: {trade}")
+                            logging.info(f"[{self.name}] [ORDER] 虛擬賣單 (平多單) 紀錄成功，已委派 PortfolioManager 處理。")
                             msg = f"💸 門神平倉出局！\n出局原因：{exit_reason}\n出場點位：{current_price}\n損益點數：{pnl:.1f}"
                             send_line_push_message(msg)
                         except Exception as e:
-                            error_msg = f"❌ [{self.name}] [ERROR] 賣單送出失敗: {e}"
+                            error_msg = f"❌ [{self.name}] [ERROR] 委派平倉單失敗: {e}"
                             logging.error(error_msg)
                             send_line_push_message(error_msg)
 
@@ -287,22 +287,21 @@ class DualTimeframeStrategy:
                     )
                     self.current_db_trade_id = -1
                     
-                    # 實體委託單送出 (Physical Order Execution)
-                    if self.api and self.contract:
+                    # Virtual Position Update & Physical Order Routing via PortfolioManager
+                    if self.portfolio and self.contract:
                         try:
-                            order = self.api.Order(
-                                action=sj.constant.Action.Buy, # 平倉買回
-                                price=0, 
-                                quantity=1,
-                                price_type=sj.constant.FuturesPriceType.MWP,
-                                order_type=sj.constant.OrderType.ROD,
-                                octype=sj.constant.FuturesOCType.Auto
+                            # 平倉，虛擬部位歸 0
+                            self.portfolio.set_virtual_position(
+                                strategy_name=self.name,
+                                contract_symbol=self.contract.code,
+                                new_position=0, 
+                                contract_obj=self.contract,
+                                average_cost=0.0
                             )
-                            trade = self.api.place_order(self.contract, order)
-                            logging.info(f"[{self.name}] [ORDER] 實體買單 (平空單) 已送出: {trade}")
+                            logging.info(f"[{self.name}] [ORDER] 虛擬買單 (平空單) 紀錄成功，已委派 PortfolioManager 處理。")
                             msg = f"💸 門神平空單出局！\n出局原因：{exit_reason}\n出場點位：{current_price}\n損益點數：{pnl:.1f}"
                             send_line_push_message(msg)
                         except Exception as e:
-                            error_msg = f"❌ [{self.name}] [ERROR] 買單送出失敗: {e}"
+                            error_msg = f"❌ [{self.name}] [ERROR] 委派平倉單失敗: {e}"
                             logging.error(error_msg)
                             send_line_push_message(error_msg)

@@ -15,6 +15,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.connection import Trader
 from src.strategies.dual_logic import DualTimeframeStrategy
+from src.portfolio_manager import PortfolioManager
 import logging
 
 # Configure logging to show strategy output
@@ -215,7 +216,8 @@ def main():
 
     # 5. Simulation Loop
     print("Running simulation...")
-    strategy = DualTimeframeStrategy(name="Gatekeeper-MXF-V1_Backtest")
+    portfolio = PortfolioManager(api=trader.api)
+    strategy = DualTimeframeStrategy(name="Gatekeeper-MXF-V1_Backtest", portfolio=portfolio, contract=target_contract)
     # from src.strategies.rubber_band import RubberBandStrategy
     # strategy = RubberBandStrategy(name="RubberBand_V1_Backtest")
     

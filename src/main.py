@@ -54,6 +54,7 @@ from src.connection import Trader
 from src.processors.kline_maker import KLineMaker
 from src.line_notify import send_line_push_message
 from src.db_logger import log_daily_equity
+from src.portfolio_manager import PortfolioManager
 
 
 def main():
@@ -146,9 +147,14 @@ def main():
         
         # 策略初始化
         from src.strategies.dual_logic import DualTimeframeStrategy
+        
+        # 建立投資組合管理員
+        portfolio = PortfolioManager(api=trader.api)
+        
         strategies = [
-            DualTimeframeStrategy(name="Gatekeeper-MXF-V1", api=trader.api, contract=target_contract),
-            # Future strategies can be added here
+            DualTimeframeStrategy(name="Gatekeeper-MXF-V1", portfolio=portfolio, contract=target_contract),
+            # 未來的新策略可以同樣傳入 portfolio 實例
+            # DualTimeframeStrategy(name="Gatekeeper-MXF-V2", portfolio=portfolio, contract=target_contract),
         ]
 
         # 定義行情 Callback
@@ -230,6 +236,7 @@ def main():
         notified_night_open = False
         notified_night_close = False
         last_date = ""
+        last_reconciliation_time = 0
 
         while True:
             try:
@@ -378,6 +385,12 @@ def main():
 
                     print(f"[{current_time_str}] 等待行情中... | 1D: {trend_status}")
                 
+                # --- Periodic Reconciliation (每 5 分鐘執行一次對帳) ---
+                current_unix_time = time.time()
+                if current_unix_time - last_reconciliation_time >= 300:
+                    portfolio.reconcile_positions(target_contract.code)
+                    last_reconciliation_time = current_unix_time
+
                 time.sleep(60)
             except Exception as e:
                 print(f"Error in monitor loop: {e}")
