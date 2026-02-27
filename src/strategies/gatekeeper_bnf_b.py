@@ -29,7 +29,7 @@ class GatekeeperBNFBStrategy:
         self.entry_time = None
         self.highest_price = 0.0
         self.stop_loss = 0.0
-        self.tp_half_triggered = (self.current_position_size == 1) # 如果只剩 1 口代表已經平掉一半了
+        self.trailing_active = False
         
         # 每日單次進場限制紀錄
         self.last_entry_date = None
@@ -44,8 +44,8 @@ class GatekeeperBNFBStrategy:
         self.volume_spike_ratio = 2.0 # Optimal parameters found via backtest sweeping
         
         self.fixed_sl_points = 100.0   # 固定停損 100 點
-        self.partial_tp_points = 80.0  # +80 點平倉一半
-        self.trailing_atr_mult = 2.0   # 剩餘部位 2xATR 移動停利
+        self.partial_tp_points = 80.0  # +80 點啟動保本與移動停利
+        self.trailing_atr_mult = 2.0   # 2xATR 移動停利
         self.time_stop_days = 3        # 持倉 3 天時間停損
 
     def check_signals(self, df_60m, df_1d=None, precalc_bullish_1d=None, precalc_signal_60m=None):
@@ -95,21 +95,21 @@ class GatekeeperBNFBStrategy:
             
             if cond_bias and cond_vol:
                 self.is_long = True
-                self.current_position_size = 2 # 固定進場 2 口
+                self.current_position_size = 1 # 固定進場 1 口
                 self.entry_price = current_price
                 self.entry_time = pd.to_datetime(current_time)
                 self.highest_price = current_price
                 
                 # 初始防護停損：-100 點
                 self.stop_loss = current_price - self.fixed_sl_points
-                self.tp_half_triggered = False
+                self.trailing_active = False
                 self.last_entry_date = current_date_str
                 
-                log_msg = f"[{self.name}] [SIGNAL] 逆勢摸底多單進場 (2口) | 價格: {self.entry_price} | Bias: {current_bias:.2f}% | 停損: {self.stop_loss}"
+                log_msg = f"[{self.name}] [SIGNAL] 逆勢摸底多單進場 (1口) | 價格: {self.entry_price} | Bias: {current_bias:.2f}% | 停損: {self.stop_loss}"
                 logging.info(log_msg)
                 
                 if "Backtest" not in self.name:
-                    send_line_push_message(f"🚨 【{self.name}】逆勢摸底啟動！\n方向：做多 2 口\n點位：{self.entry_price}\n乖離率：{current_bias:.2f}%\n停損：{self.stop_loss}")
+                    send_line_push_message(f"🚨 【{self.name}】逆勢摸底啟動！\n方向：做多 1 口\n點位：{self.entry_price}\n乖離率：{current_bias:.2f}%\n停損：{self.stop_loss}")
                     
                     self.current_db_trade_id = log_trade_entry(
                         strategy_name=self.name,
@@ -123,7 +123,7 @@ class GatekeeperBNFBStrategy:
                             self.portfolio.set_virtual_position(
                                 strategy_name=self.name,
                                 contract_symbol=self.contract.code,
-                                new_position=2,
+                                new_position=1,
                                 contract_obj=self.contract,
                                 average_cost=self.entry_price
                             )
@@ -138,36 +138,25 @@ class GatekeeperBNFBStrategy:
             profit = current_price - self.entry_price
             
             exit_reason = None
-            close_qty = 0 # 預計要平倉的口數
             
-            # 1. 部分停利 (Partial TP): 達到 +80 點時平倉 1 口
-            if not self.tp_half_triggered and profit >= self.partial_tp_points:
-                self.tp_half_triggered = True
-                close_qty = 1 # 準備平倉 1 口
-                self.current_position_size = 1
+            # 1. 達標啟動保本與移動停利: 達到 +80 點時
+            if not self.trailing_active and profit >= self.partial_tp_points:
+                self.trailing_active = True
                 
-                # 將剩下的那一口的停損立刻拉升，改用 Trailing Stop (High - 2*ATR)
+                # 將停損立刻拉升，改用 Trailing Stop (High - 2*ATR)
                 # 並確保停損絕對不會低於成本（保本）
                 new_sl = max(self.entry_price, self.highest_price - (self.trailing_atr_mult * current_atr))
                 self.stop_loss = new_sl
                 
-                msg = f"🎯 [{self.name}] 達到 +80 點第一階段目標！平倉 1 口入袋安息。\n目前價格: {current_price}\n剩餘 1 口啟動移動停利: {self.stop_loss:.1f}"
+                msg = f"🎯 [{self.name}] 達到 +80 點目標！啟動保本與移動停利。\n目前價格: {current_price}\n停損移至: {self.stop_loss:.1f}"
                 logging.info(msg)
                 if "Backtest" not in self.name:
                     send_line_push_message(msg)
-                    if self.portfolio and self.contract:
-                        self.portfolio.set_virtual_position(
-                            strategy_name=self.name,
-                            contract_symbol=self.contract.code,
-                            new_position=1, # 部位從 2 降為 1
-                            contract_obj=self.contract,
-                            average_cost=self.entry_price
-                        )
             
             # --- 檢查全數平倉條件 ---
             # 更新剩餘部位的移動停利軌道
-            if self.tp_half_triggered:
-                # 已經觸發過半數平倉，持續上修 Trailing Stop
+            if self.trailing_active:
+                # 已經觸發過達標，持續上修 Trailing Stop
                 potential_sl = self.highest_price - (self.trailing_atr_mult * current_atr)
                 self.stop_loss = max(self.stop_loss, potential_sl)
 
