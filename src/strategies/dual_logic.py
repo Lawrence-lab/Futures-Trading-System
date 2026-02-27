@@ -213,7 +213,8 @@ class DualTimeframeStrategy:
                         trade_id=self.current_db_trade_id,
                         exit_price=float(current_price),
                         exit_time=current_time,
-                        pnl_points=float(pnl)
+                        pnl_points=float(pnl),
+                        exit_reason=exit_reason
                     )
                     self.current_db_trade_id = -1
                     
@@ -281,7 +282,8 @@ class DualTimeframeStrategy:
                         trade_id=self.current_db_trade_id,
                         exit_price=float(current_price),
                         exit_time=current_time,
-                        pnl_points=float(pnl)
+                        pnl_points=float(pnl),
+                        exit_reason=exit_reason
                     )
                     self.current_db_trade_id = -1
                     

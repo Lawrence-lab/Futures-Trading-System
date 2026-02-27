@@ -41,7 +41,7 @@ def log_trade_entry(strategy_name: str, side: str, entry_price: float, entry_tim
         conn.close()
     return trade_id
 
-def log_trade_exit(trade_id: int, exit_price: float, exit_time, pnl_points: float):
+def log_trade_exit(trade_id: int, exit_price: float, exit_time, pnl_points: float, exit_reason: str = ""):
     """Updates an existing trade record with exit information."""
     if trade_id == -1: return
     
@@ -53,10 +53,10 @@ def log_trade_exit(trade_id: int, exit_price: float, exit_time, pnl_points: floa
         cursor.execute(
             """
             UPDATE trade_history 
-            SET exit_price = %s, exit_time = %s, pnl_points = %s, status = 'Closed'
+            SET exit_price = %s, exit_time = %s, pnl_points = %s, exit_reason = %s, status = 'Closed'
             WHERE id = %s;
             """,
-            (exit_price, exit_time, pnl_points, trade_id)
+            (exit_price, exit_time, pnl_points, exit_reason, trade_id)
         )
         conn.commit()
         cursor.close()

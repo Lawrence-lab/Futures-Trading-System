@@ -43,8 +43,15 @@ try:
     print("正在建立 equity_logs 表格...")
     cursor.execute(create_equity_logs_sql)
     
+    print("正在檢查並升級 trade_history 結構 (加入 exit_reason)...")
+    try:
+        cursor.execute("ALTER TABLE trade_history ADD COLUMN IF NOT EXISTS exit_reason VARCHAR(100);")
+    except psycopg2.Error as e:
+        print(f"Warning: 無法新增 exit_reason 欄位 (可能已存在或權限不足): {e}")
+        conn.rollback() # Rollback the failed ALTER, but continue with the rest
+        
     conn.commit()
-    print("✅ 表格建立成功！")
+    print("✅ 表格建立/升級成功！")
     
     cursor.close()
     conn.close()
