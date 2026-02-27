@@ -112,9 +112,9 @@ def main():
             from datetime import timedelta
             import pandas as pd
             
-            print("正在向永豐 API 調閱過去 14 天歷史 K 線以初始化指標...")
+            print("正在向永豐 API 調閱過去 30 天歷史 K 線以初始化指標...")
             end_date = datetime.now().strftime("%Y-%m-%d")
-            start_date = (datetime.now() - timedelta(days=14)).strftime("%Y-%m-%d")
+            start_date = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
             
             kbars = trader.api.kbars(contract=target_contract, start=start_date, end=end_date)
             
@@ -222,8 +222,6 @@ def main():
         except Exception as e:
             print(f"⚠️ 取得初始權益數或寫入資料庫失敗: {e}")
         # -----------------------------
-        
-        from datetime import datetime
         import pytz
         tw_tz = pytz.timezone('Asia/Taipei')
         
@@ -325,12 +323,31 @@ def main():
                         send_line_push_message(msg_night_close)
                         notified_night_close = True
                         
-                    # ===================
-                    
-                    # Handle undefined variables conditionally
-                    days_left = "N/A" 
+                    # Dynamic Status Dashboard Lookups
+                    days_left = "N/A"
+                    if getattr(target_contract, 'delivery_date', None):
+                        try:
+                            # Usually format 'YYYY/MM/DD' or 'YYYYMMDD'
+                            delivery_str = str(target_contract.delivery_date).replace('/', '')
+                            if len(delivery_str) >= 8:
+                                del_date = datetime.strptime(delivery_str[:8], "%Y%m%d")
+                                days_left = (del_date - datetime.now()).days
+                        except:
+                            pass
+                            
                     trend_status = "N/A"
-                    print(f"[{current_time}] [Monitor] Expiry: {days_left}d | 1D: {trend_status} | 60M Price: {price}")
+                    try:
+                        df_1d = maker_1d.get_dataframe()
+                        if not df_1d.empty and len(df_1d) >= 10:
+                            from src.strategies.indicators import calculate_supertrend
+                            is_bullish, _ = calculate_supertrend(df_1d)
+                            trend_status = "BULL (多)" if is_bullish else "BEAR (空)"
+                    except Exception as e:
+                        import traceback
+                        print(f"Failed to fetch 1D trend: {e}")
+                        traceback.print_exc()
+
+                    print(f"[{current_time}] [Monitor] Expiry: {days_left}d | 1D: {trend_status} | Current Price: {price}")
                     
                     # Print status for each strategy
                     for strategy in strategies:
@@ -344,7 +361,21 @@ def main():
                         print(f"   -> [{strategy.name}] Position: {pos_status} | Entry: {strategy.entry_price}")
                     
                 else:
-                    print(f"[{current_time}] 等待行情中...")
+                    # Dashboard Output (No Tick State)
+                    current_time_str = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
+                    trend_status = "N/A"
+                    try:
+                        df_1d = maker_1d.get_dataframe()
+                        if not df_1d.empty and len(df_1d) >= 10:
+                            from src.strategies.indicators import calculate_supertrend
+                            is_bullish, _ = calculate_supertrend(df_1d)
+                            trend_status = "BULL (多)" if is_bullish else "BEAR (空)"
+                    except Exception as e:
+                        import traceback
+                        print(f"Failed to fetch 1D trend (No Tick State): {e}")
+                        traceback.print_exc()
+
+                    print(f"[{current_time_str}] 等待行情中... | 1D: {trend_status}")
                 
                 time.sleep(60)
             except Exception as e:
