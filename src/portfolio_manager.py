@@ -37,7 +37,9 @@ class PortfolioManager:
         """
         conn = get_db_connection()
         if not conn: 
-            logging.error("[PortfolioManager] 無法連線至資料庫，拒絕更新部位。")
+            error_msg = f"🚨 [嚴重錯誤] 無法連線至資料庫！({strategy_name} 欲更新部位)。為避免資料不一致，系統已取消這次的實體下單動作。"
+            logging.error(error_msg)
+            send_line_push_message(error_msg)
             return
 
         delta = 0
@@ -79,7 +81,9 @@ class PortfolioManager:
             delta = new_net_position - old_net_position
 
         except Exception as e:
-            logging.error(f"[PortfolioManager] 更新虛擬部位時發生錯誤: {e}")
+            error_msg = f"🚨 [嚴重錯誤] 更新資料庫虛擬部位時發生異常: {e}。為避免記錄與實際部位不一致，本次實體委託單已被系統取消。"
+            logging.error(error_msg)
+            send_line_push_message(error_msg)
             conn.rollback() # 發生錯誤則回滾，避免記錄與實際委託不一致
             return
         finally:
