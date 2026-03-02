@@ -9,6 +9,36 @@ warnings.filterwarnings('ignore', category=UserWarning, module='pandas')
 st.set_page_config(page_title="交易追蹤儀表板", layout="wide")
 st.title("📈 演算法交易追蹤儀表板")
 
+@st.cache_resource # Cache the Shioaji API instance indefinitely to avoid rate limiting
+def get_shioaji_api():
+    from src.connection import Trader
+    try:
+        trader = Trader()
+        trader.login()
+        return trader.api
+    except Exception as e:
+        st.error(f"Shioaji API 登入失敗: {e}")
+        return None
+
+def get_realtime_equity(api):
+    if not api: return None
+    try:
+        acc = api.futopt_account
+        if acc:
+            margin_res = api.margin(acc)
+            if margin_res:
+                margin_data = margin_res[0] if isinstance(margin_res, list) and len(margin_res) > 0 else margin_res
+                t_equity = getattr(margin_data, 'equity', 0.0) 
+                if not t_equity and isinstance(margin_data, dict):
+                    t_equity = margin_data.get('equity', 0.0)
+                return float(t_equity)
+    except Exception as e:
+        print(f"取得即時權益數失敗: {e}")
+    return None
+
+api = get_shioaji_api()
+realtime_equity = get_realtime_equity(api)
+
 conn = get_streamlit_db_connection()
 if not conn:
     st.error("無法連線至資料庫，請檢查連線設定與網絡狀態。")
@@ -28,14 +58,14 @@ try:
     """)
     current_position = cursor.fetchone()
     
-    # 2. 權益總額 (最新的一筆 equity_logs)
+    # 2. 權益總額 (從資料庫當作備用 fallback)
     cursor.execute("""
         SELECT total_equity, available_margin, log_date
         FROM equity_logs
         ORDER BY log_date DESC
         LIMIT 1;
     """)
-    latest_equity = cursor.fetchone()
+    latest_equity_db = cursor.fetchone()
     
     # 3. 本週點數損益 (近 7 天)
     cursor.execute("""
@@ -62,8 +92,12 @@ try:
     col1.metric("📌 當前倉位", pos_text)
     
     # 權益總額處理
-    eq_val = f"{latest_equity[0]:,.0f}" if latest_equity and latest_equity[0] is not None else "N/A"
-    col2.metric("💰 權益總額", eq_val)
+    if realtime_equity is not None:
+        eq_val = f"{realtime_equity:,.0f}"
+    else:
+        eq_val = f"{latest_equity_db[0]:,.0f}" if latest_equity_db and latest_equity_db[0] is not None else "N/A"
+        
+    col2.metric("💰 即時權益總額", eq_val)
     
     # 本週點數損益處理
     pnl_val = f"{weekly_pnl:+.1f} 點" if weekly_pnl is not None else "0 點"
