@@ -94,7 +94,7 @@ class PortfolioManager:
             logging.info(f"[PortfolioManager] {contract_symbol} 總淨部位變更: {old_net_position} -> {new_net_position} (Delta: {delta})")
             if self.api and contract_obj:
                 # 我們不在此處阻擋 strategy 本身的通知，但 PortfolioManager 會默默處理實體單
-                self._execute_real_order(contract_obj, delta)
+                self._execute_real_order(contract_obj, delta, price=average_cost)
             elif not contract_obj:
                 msg = f"⚠️ [PortfolioManager] 警告：需要下單 Delta: {delta} 但未提供合約物件！"
                 logging.warning(msg)
@@ -103,22 +103,31 @@ class PortfolioManager:
                 # 回測模式或無 API 模式下，不發送實體單
                 logging.info(f"[PortfolioManager] 無 API 實例，跳過實體委託 (Delta: {delta})")
 
-    def _execute_real_order(self, contract, delta: int):
+    def _execute_real_order(self, contract, delta: int, price: float = 0.0):
         """執行實體委託單送出"""
         action = sj.constant.Action.Buy if delta > 0 else sj.constant.Action.Sell
         qty = abs(delta)
 
+        # 為了支援夜盤，改用限價單 (LMT) 代替市價單 (MWP)
+        # 加減價 50 點作為讓價，模擬市價單確保成交 (IOC)
+        order_price = float(price)
+        if price > 0:
+            if action == sj.constant.Action.Buy:
+                order_price = price + 50
+            else:
+                order_price = price - 50
+
         try:
             order = self.api.Order(
                 action=action,
-                price=0,
+                price=order_price,
                 quantity=qty,
-                price_type=sj.constant.FuturesPriceType.MWP, # 市價單
-                order_type=sj.constant.OrderType.IOC,
+                price_type=sj.constant.FuturesPriceType.LMT, # 限價單
+                order_type=sj.constant.OrderType.IOC, # 保持 IOC 立即成交否則取消
                 octype=sj.constant.FuturesOCType.Auto
             )
             trade = self.api.place_order(contract, order)
-            logging.info(f"[PortfolioManager] [ORDER] 系統代發淨額調整單已送出: 行為={action}, 數量={qty}, Trade={trade}")
+            logging.info(f"[PortfolioManager] [ORDER] 系統代發淨額調整單已送出: 行為={action}, 數量={qty}, 委託定價={order_price}, Trade={trade}")
         except Exception as e:
             error_msg = f"❌ [PortfolioManager] [ERROR] 淨額單送出失敗 (Delta: {delta}): {e}"
             logging.error(error_msg)
