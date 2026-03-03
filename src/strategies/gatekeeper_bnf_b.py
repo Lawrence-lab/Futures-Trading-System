@@ -116,7 +116,7 @@ class GatekeeperBNFBStrategy:
                         log_msg = f"[{self.name}] [SIGNAL] 逆勢摸底多單進場 (1口) | 價格: {self.entry_price} | Bias: {current_bias:.2f}% | 停損: {self.stop_loss}"
                         logging.info(log_msg)
                         
-                        if "Backtest" not in self.name:
+                        if "Backtest" not in self.name and "Opt" not in self.name:
                             send_line_push_message(f"🚨 【{self.name}】逆勢摸底啟動！\n方向：做多 1 口\n點位：{self.entry_price}\n乖離率：{current_bias:.2f}%\n停損：{self.stop_loss}")
                             
                             self.current_db_trade_id = log_trade_entry(
@@ -157,7 +157,7 @@ class GatekeeperBNFBStrategy:
                         log_msg = f"[{self.name}] [SIGNAL] 逆勢摸頭空單進場 (1口) | 價格: {self.entry_price} | Bias: {current_bias:.2f}% | 停損: {self.stop_loss}"
                         logging.info(log_msg)
                         
-                        if "Backtest" not in self.name:
+                        if "Backtest" not in self.name and "Opt" not in self.name:
                             send_line_push_message(f"🚨 【{self.name}】逆勢摸頭啟動！\n方向：做空 1 口\n點位：{self.entry_price}\n乖離率：{current_bias:.2f}%\n停損：{self.stop_loss}")
                             
                             self.current_db_trade_id = log_trade_entry(
@@ -199,7 +199,7 @@ class GatekeeperBNFBStrategy:
                 
                 msg = f"🎯 [{self.name}] 達到 {self.partial_tp_points} 點目標！啟動多單保本與移動停利。\n目前價格: {current_price}\n停損移至: {self.stop_loss:.1f}"
                 logging.info(msg)
-                if "Backtest" not in self.name:
+                if "Backtest" not in self.name and "Opt" not in self.name:
                     send_line_push_message(msg)
             
             # --- 檢查全數平倉條件 ---
@@ -242,7 +242,7 @@ class GatekeeperBNFBStrategy:
                 
                 msg = f"🎯 [{self.name}] 達到 {self.partial_tp_points} 點目標！啟動空單保本與移動停利。\n目前價格: {current_price}\n停損移至: {self.stop_loss:.1f}"
                 logging.info(msg)
-                if "Backtest" not in self.name:
+                if "Backtest" not in self.name and "Opt" not in self.name:
                     send_line_push_message(msg)
             
             # --- 檢查全數平倉條件 ---
@@ -287,7 +287,7 @@ class GatekeeperBNFBStrategy:
             'reason': exit_reason
         })
         
-        if "Backtest" not in self.name:
+        if "Backtest" not in self.name and "Opt" not in self.name:
             if self.current_db_trade_id != -1:
                 log_trade_exit(
                     trade_id=self.current_db_trade_id,
