@@ -114,7 +114,7 @@ class PortfolioManager:
                 price=0,
                 quantity=qty,
                 price_type=sj.constant.FuturesPriceType.MWP, # 市價單
-                order_type=sj.constant.OrderType.ROD,
+                order_type=sj.constant.OrderType.IOC,
                 octype=sj.constant.FuturesOCType.Auto
             )
             trade = self.api.place_order(contract, order)
