@@ -76,6 +76,28 @@ class DualTimeframeStrategy:
             
             # Long Entry
             if is_bullish_1d and signal_60m == "Buy" and bullish_body:
+                # 1. 嘗試發送實體單並登記虛擬部位
+                order_success = True
+                if self.portfolio and self.contract:
+                    try:
+                        order_success = self.portfolio.set_virtual_position(
+                            strategy_name=self.name,
+                            contract_symbol=self.contract.code,
+                            new_position=1, # 1 for Long
+                            contract_obj=self.contract,
+                            average_cost=current_price
+                        )
+                        if order_success:
+                            logging.info(f"[{self.name}] [ORDER] 虛擬買單紀錄與實體單確認成功。")
+                    except Exception as e:
+                        error_msg = f"❌ [{self.name}] [ERROR] 委派買單失敗: {e}"
+                        logging.error(error_msg)
+                        order_success = False
+
+                if not order_success:
+                    return
+
+                # 2. 實體驗證成功後，才更新內部狀態
                 self.is_long = True
                 self.entry_price = current_price
                 self.entry_time = current_time
@@ -104,25 +126,31 @@ class DualTimeframeStrategy:
                         entry_price=float(self.entry_price),
                         entry_time=current_time
                     )
-                    
-                    # Virtual Position Update & Physical Order Routing via PortfolioManager
-                    if self.portfolio and self.contract:
-                        try:
-                            self.portfolio.set_virtual_position(
-                                strategy_name=self.name,
-                                contract_symbol=self.contract.code,
-                                new_position=1, # 1 for Long
-                                contract_obj=self.contract,
-                                average_cost=self.entry_price
-                            )
-                            logging.info(f"[{self.name}] [ORDER] 虛擬買單紀錄成功，已委派 PortfolioManager 處理。")
-                        except Exception as e:
-                            error_msg = f"❌ [{self.name}] [ERROR] 委派買單失敗: {e}"
-                            logging.error(error_msg)
-                            send_line_push_message(error_msg)
 
             # Short Entry
             elif not is_bullish_1d and signal_60m == "Sell" and bearish_body:
+                # 1. 嘗試發送實體單並登記虛擬部位
+                order_success = True
+                if self.portfolio and self.contract:
+                    try:
+                        order_success = self.portfolio.set_virtual_position(
+                            strategy_name=self.name,
+                            contract_symbol=self.contract.code,
+                            new_position=-1, # -1 for Short
+                            contract_obj=self.contract,
+                            average_cost=current_price
+                        )
+                        if order_success:
+                            logging.info(f"[{self.name}] [ORDER] 虛擬賣單紀錄與實體單確認成功。")
+                    except Exception as e:
+                        error_msg = f"❌ [{self.name}] [ERROR] 委派放空訂單失敗: {e}"
+                        logging.error(error_msg)
+                        order_success = False
+
+                if not order_success:
+                    return
+
+                # 2. 實體驗證成功後，才更新內部狀態
                 self.is_short = True
                 self.entry_price = current_price
                 self.entry_time = current_time
@@ -151,22 +179,6 @@ class DualTimeframeStrategy:
                         entry_price=float(self.entry_price),
                         entry_time=current_time
                     )
-                    
-                    # Virtual Position Update & Physical Order Routing via PortfolioManager
-                    if self.portfolio and self.contract:
-                        try:
-                            self.portfolio.set_virtual_position(
-                                strategy_name=self.name,
-                                contract_symbol=self.contract.code,
-                                new_position=-1, # -1 for Short
-                                contract_obj=self.contract,
-                                average_cost=self.entry_price
-                            )
-                            logging.info(f"[{self.name}] [ORDER] 虛擬賣單紀錄成功，已委派 PortfolioManager 處理。")
-                        except Exception as e:
-                            error_msg = f"❌ [{self.name}] [ERROR] 委派賣單失敗: {e}"
-                            logging.error(error_msg)
-                            send_line_push_message(error_msg)
 
         
         # Exit / Risk Management Logic
@@ -193,6 +205,32 @@ class DualTimeframeStrategy:
                 exit_reason = "Stop Loss" if not self.break_even_triggered else "Break Even"
             
             if exit_reason:
+                # 1. 嘗試發送實體平倉單
+                order_success = True
+                if "Backtest" not in self.name:
+                    if self.portfolio and self.contract:
+                        try:
+                            # 平倉，虛擬部位歸 0
+                            order_success = self.portfolio.set_virtual_position(
+                                strategy_name=self.name,
+                                contract_symbol=self.contract.code,
+                                new_position=0, 
+                                contract_obj=self.contract,
+                                average_cost=current_price
+                            )
+                            if order_success:
+                                logging.info(f"[{self.name}] [ORDER] 虛擬賣單 (平多單) 紀錄與實體單確認成功。")
+                        except Exception as e:
+                            error_msg = f"❌ [{self.name}] [ERROR] 委派平倉單失敗: {e}"
+                            logging.error(error_msg)
+                            order_success = False
+                            
+                    if not order_success:
+                        msg = f"⚠️ 【{self.name}】平多單委託被拒絕，系統將保留當前內部部位！\n出局原因：{exit_reason}\n價格：{current_price}"
+                        send_line_push_message(msg)
+                        return
+
+                # 2. 成功後才清理內部狀態與回報交易紀錄
                 self.is_long = False
                 pnl = current_price - self.entry_price
                 logging.info(f"[{self.name}] [EXIT] {exit_reason} (Long) | 時間: {current_time} | 出場價格: {current_price} | 損益: {pnl}")
@@ -219,24 +257,8 @@ class DualTimeframeStrategy:
                     )
                     self.current_db_trade_id = -1
                     
-                    # Virtual Position Update & Physical Order Routing via PortfolioManager
-                    if self.portfolio and self.contract:
-                        try:
-                            # 平倉，虛擬部位歸 0
-                            self.portfolio.set_virtual_position(
-                                strategy_name=self.name,
-                                contract_symbol=self.contract.code,
-                                new_position=0, 
-                                contract_obj=self.contract,
-                                average_cost=0.0
-                            )
-                            logging.info(f"[{self.name}] [ORDER] 虛擬賣單 (平多單) 紀錄成功，已委派 PortfolioManager 處理。")
-                            msg = f"💸 門神平倉出局！\n出局原因：{exit_reason}\n出場點位：{current_price}\n損益點數：{pnl:.1f}"
-                            send_line_push_message(msg)
-                        except Exception as e:
-                            error_msg = f"❌ [{self.name}] [ERROR] 委派平倉單失敗: {e}"
-                            logging.error(error_msg)
-                            send_line_push_message(error_msg)
+                    msg = f"💸 門神平倉出局！\n出局原因：{exit_reason}\n出場點位：{current_price}\n損益點數：{pnl:.1f}"
+                    send_line_push_message(msg)
 
         elif self.is_short:
             self.lowest_price = min(self.lowest_price, current_price)
@@ -261,6 +283,32 @@ class DualTimeframeStrategy:
                 exit_reason = "Stop Loss" if not self.break_even_triggered else "Break Even"
             
             if exit_reason:
+                # 1. 嘗試發送實體平倉單
+                order_success = True
+                if "Backtest" not in self.name:
+                    if self.portfolio and self.contract:
+                        try:
+                            # 平倉，虛擬部位歸 0
+                            order_success = self.portfolio.set_virtual_position(
+                                strategy_name=self.name,
+                                contract_symbol=self.contract.code,
+                                new_position=0, 
+                                contract_obj=self.contract,
+                                average_cost=current_price
+                            )
+                            if order_success:
+                                logging.info(f"[{self.name}] [ORDER] 虛擬買單 (平空單) 紀錄與實體單確認成功。")
+                        except Exception as e:
+                            error_msg = f"❌ [{self.name}] [ERROR] 委派平倉單失敗: {e}"
+                            logging.error(error_msg)
+                            order_success = False
+                            
+                    if not order_success:
+                        msg = f"⚠️ 【{self.name}】平空單委託被拒絕，系統將保留當前內部部位！\n出局原因：{exit_reason}\n價格：{current_price}"
+                        send_line_push_message(msg)
+                        return
+
+                # 2. 成功後才清理內部狀態與回報交易紀錄
                 self.is_short = False
                 pnl = self.entry_price - current_price
                 logging.info(f"[{self.name}] [EXIT] {exit_reason} (Short) | 時間: {current_time} | 出場價格: {current_price} | 損益: {pnl}")
@@ -287,21 +335,5 @@ class DualTimeframeStrategy:
                     )
                     self.current_db_trade_id = -1
                     
-                    # Virtual Position Update & Physical Order Routing via PortfolioManager
-                    if self.portfolio and self.contract:
-                        try:
-                            # 平倉，虛擬部位歸 0
-                            self.portfolio.set_virtual_position(
-                                strategy_name=self.name,
-                                contract_symbol=self.contract.code,
-                                new_position=0, 
-                                contract_obj=self.contract,
-                                average_cost=0.0
-                            )
-                            logging.info(f"[{self.name}] [ORDER] 虛擬買單 (平空單) 紀錄成功，已委派 PortfolioManager 處理。")
-                            msg = f"💸 門神平空單出局！\n出局原因：{exit_reason}\n出場點位：{current_price}\n損益點數：{pnl:.1f}"
-                            send_line_push_message(msg)
-                        except Exception as e:
-                            error_msg = f"❌ [{self.name}] [ERROR] 委派平倉單失敗: {e}"
-                            logging.error(error_msg)
-                            send_line_push_message(error_msg)
+                    msg = f"💸 門神平空單出局！\n出局原因：{exit_reason}\n出場點位：{current_price}\n損益點數：{pnl:.1f}"
+                    send_line_push_message(msg)

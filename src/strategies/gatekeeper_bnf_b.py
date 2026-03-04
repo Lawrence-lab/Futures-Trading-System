@@ -108,6 +108,26 @@ class GatekeeperBNFBStrategy:
                     cond_bias = current_bias < self.bias_threshold
                     
                     if cond_bias:
+                        # 1. 先嘗試發送實體單並登記虛擬部位
+                        order_success = True
+                        if self.portfolio and self.contract:
+                            try:
+                                order_success = self.portfolio.set_virtual_position(
+                                    strategy_name=self.name,
+                                    contract_symbol=self.contract.code,
+                                    new_position=1,
+                                    contract_obj=self.contract,
+                                    average_cost=current_price
+                                )
+                            except Exception as e:
+                                logging.error(f"❌ [{self.name}] 委派買單失敗: {e}")
+                                order_success = False
+
+                        if not order_success:
+                            # 實體單失敗，放棄進場，避免資料不同步
+                            return
+
+                        # 2. 實體單與資料庫更新成功後，才更新內部狀態並發送通知
                         self.is_long = True
                         self.current_position_size = 1 # 固定進場 1 口
                         self.entry_price = current_price
@@ -131,24 +151,32 @@ class GatekeeperBNFBStrategy:
                                 entry_price=float(self.entry_price),
                                 entry_time=current_time
                             )
-                            
-                            if self.portfolio and self.contract:
-                                try:
-                                    self.portfolio.set_virtual_position(
-                                        strategy_name=self.name,
-                                        contract_symbol=self.contract.code,
-                                        new_position=1,
-                                        contract_obj=self.contract,
-                                        average_cost=self.entry_price
-                                    )
-                                except Exception as e:
-                                    logging.error(f"❌ [{self.name}] 委派買單失敗: {e}")
                 else:
                     # 空頭趨勢 -> 只做空 (摸頭)
                     # 條件 2：Bias > |閾值|
                     cond_bias = current_bias > abs(self.bias_threshold)
                     
                     if cond_bias:
+                        # 1. 先嘗試發送實體單並登記虛擬部位
+                        order_success = True
+                        if self.portfolio and self.contract:
+                            try:
+                                order_success = self.portfolio.set_virtual_position(
+                                    strategy_name=self.name,
+                                    contract_symbol=self.contract.code,
+                                    new_position=-1,
+                                    contract_obj=self.contract,
+                                    average_cost=current_price
+                                )
+                            except Exception as e:
+                                logging.error(f"❌ [{self.name}] 委派賣庫存單失敗: {e}")
+                                order_success = False
+
+                        if not order_success:
+                            # 實體單失敗，放棄進場，避免資料不同步
+                            return
+
+                        # 2. 實體單與資料庫更新成功後，才更新內部狀態並發送通知
                         self.is_short = True
                         self.current_position_size = 1 # 固定進場 1 口
                         self.entry_price = current_price
@@ -172,18 +200,6 @@ class GatekeeperBNFBStrategy:
                                 entry_price=float(self.entry_price),
                                 entry_time=current_time
                             )
-                            
-                            if self.portfolio and self.contract:
-                                try:
-                                    self.portfolio.set_virtual_position(
-                                        strategy_name=self.name,
-                                        contract_symbol=self.contract.code,
-                                        new_position=-1,
-                                        contract_obj=self.contract,
-                                        average_cost=self.entry_price
-                                    )
-                                except Exception as e:
-                                    logging.error(f"❌ [{self.name}] 委派賣庫存單失敗: {e}")
 
         # ====================
         # 出場與風控邏輯 (Exit)
@@ -278,6 +294,28 @@ class GatekeeperBNFBStrategy:
         """共用的出場結算腳本"""
         direction = "Long" if self.is_long else "Short"
         
+        # 1. 先嘗試發送實體平倉單
+        order_success = True
+        if "Backtest" not in self.name and "Opt" not in self.name:
+            if self.portfolio and self.contract:
+                try:
+                    order_success = self.portfolio.set_virtual_position(
+                        strategy_name=self.name,
+                        contract_symbol=self.contract.code,
+                        new_position=0, 
+                        contract_obj=self.contract,
+                        average_cost=current_price
+                    )
+                except Exception as e:
+                    logging.error(f"❌ [{self.name}] 委派平倉單失敗: {e}")
+                    order_success = False
+            
+            if not order_success:
+                msg = f"⚠️ 【{self.name}】平倉委託被拒絕，系統將保留當前內部部位，請檢視環境與連線狀態！\n出局原因：{exit_reason}\n價格：{current_price}"
+                send_line_push_message(msg)
+                return
+
+        # 2. 實體單與資料庫更新成功後，才清理內部狀態與回報交易紀錄
         self.is_long = False
         self.is_short = False
         self.current_position_size = 0
@@ -304,16 +342,5 @@ class GatekeeperBNFBStrategy:
                 )
                 self.current_db_trade_id = -1
                 
-            if self.portfolio and self.contract:
-                try:
-                    self.portfolio.set_virtual_position(
-                        strategy_name=self.name,
-                        contract_symbol=self.contract.code,
-                        new_position=0, 
-                        contract_obj=self.contract,
-                        average_cost=0.0
-                    )
-                    action_str = "全數平倉" if direction == "Long" else "空單全數回補"
-                    send_line_push_message(f"💸 【{self.name}】{action_str}結案！\n原因：{exit_reason}\n出場點位：{current_price}\n此口損益結算：{final_pnl:.1f}")
-                except Exception as e:
-                    logging.error(f"❌ [{self.name}] 委派平倉單失敗: {e}")
+            action_str = "全數平倉" if direction == "Long" else "空單全數回補"
+            send_line_push_message(f"💸 【{self.name}】{action_str}結案！\n原因：{exit_reason}\n出場點位：{current_price}\n此口損益結算：{final_pnl:.1f}")
