@@ -81,8 +81,14 @@ class GatekeeperBNFBStrategy:
         # 取得日期用於「單日進場限制」與「時間停損」
         current_date_str = pd.to_datetime(current_time).strftime("%Y-%m-%d")
 
-        # 判定大趨勢 (若 precalc_bullish_1d 未提供，預設偏向做多，相容舊邏輯)
-        is_bull_trend = precalc_bullish_1d if precalc_bullish_1d is not None else True
+        # 判定大趨勢 (由日 K 的 Supertrend 決定)
+        if precalc_bullish_1d is not None:
+            is_bull_trend = precalc_bullish_1d
+        else:
+            from .indicators import calculate_supertrend
+            is_bull_trend, _ = calculate_supertrend(df_1d) if df_1d is not None and not df_1d.empty else (None, None)
+            if is_bull_trend is None:
+                is_bull_trend = True # 若日 K 資料不足，預設偏多相容舊邏輯
 
         # ====================
         # 進場邏輯 (Entry)
