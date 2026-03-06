@@ -196,7 +196,20 @@ class PortfolioManager:
                         qty = pos.quantity
                         real_position += (direction_sign * qty)
         except Exception as e:
+            error_msg = str(e)
             logging.error(f"[PortfolioManager_Reconciliation] 無法取得實體部位: {e}")
+            # Detect token expiration or disconnects and re-login automatically
+            if any(k in error_msg.lower() for k in ["expired", "401", "not ready", "payload"]):
+                logging.info("[PortfolioManager] 偵測到 Token 過期或連線異常，嘗試重新登入 Shioaji API...")
+                try:
+                    from src.config import settings
+                    self.api.login(
+                        api_key=settings.api_key,
+                        secret_key=settings.secret_key
+                    )
+                    logging.info("[PortfolioManager] 重新登入成功！")
+                except Exception as relogin_e:
+                    logging.error(f"[PortfolioManager] 重新登入失敗: {relogin_e}")
             return # 取得失敗不當作異常對帳
 
         # 取回資料庫中的虛擬總淨部位

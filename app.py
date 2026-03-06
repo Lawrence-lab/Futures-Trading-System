@@ -4,12 +4,12 @@ import warnings
 from src.db_logger import get_streamlit_db_connection
 
 # Suppress Pandas SQLAlchemy warning since we use direct psycopg2 connection here
-warnings.filterwarnings('ignore', category=UserWarning, module='pandas')
+warnings.filterwarnings('ignore', message='.*pandas only supports SQLAlchemy connectable.*')
 
 st.set_page_config(page_title="交易追蹤儀表板", layout="wide")
 st.title("📈 演算法交易追蹤儀表板")
 
-@st.cache_resource # Cache the Shioaji API instance indefinitely to avoid rate limiting
+@st.cache_resource(ttl=3600) # Cache the Shioaji API instance, but refresh every hour to avoid token expiration
 def get_shioaji_api():
     from src.connection import Trader
     try:
