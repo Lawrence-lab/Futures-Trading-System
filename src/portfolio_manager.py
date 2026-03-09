@@ -1,7 +1,7 @@
 import logging
 import shioaji as sj
 from src.db_logger import get_db_connection
-from src.line_notify import send_line_push_message
+from src.discord_notify import send_discord_message
 
 class PortfolioManager:
     def __init__(self, api=None):
@@ -40,7 +40,7 @@ class PortfolioManager:
         if not conn: 
             error_msg = f"🚨 [嚴重錯誤] 無法連線至資料庫！({strategy_name} 欲更新部位)。為避免資料不一致，系統已取消這次的實體下單動作。"
             logging.error(error_msg)
-            send_line_push_message(error_msg)
+            send_discord_message(error_msg)
             return False
 
         delta = 0
@@ -72,7 +72,7 @@ class PortfolioManager:
         except Exception as e:
             error_msg = f"🚨 [嚴重錯誤] 查詢資料庫虛擬部位時發生異常: {e}。"
             logging.error(error_msg)
-            send_line_push_message(error_msg)
+            send_discord_message(error_msg)
             conn.close()
             return False
 
@@ -86,7 +86,7 @@ class PortfolioManager:
             elif not contract_obj:
                 msg = f"⚠️ [PortfolioManager] 警告：需要下單 Delta: {delta} 但未提供合約物件！"
                 logging.warning(msg)
-                send_line_push_message(msg)
+                send_discord_message(msg)
                 order_success = False
             elif not self.api:
                 logging.info(f"[PortfolioManager] 無 API 實例，跳過實體委託 (Delta: {delta})，視為成功。")
@@ -94,7 +94,7 @@ class PortfolioManager:
         if not order_success:
             msg = f"❌ [{strategy_name}] API 實體單委託失敗，系統已自動取消寫入虛擬部位，避免狀態不同步！"
             logging.warning(msg)
-            send_line_push_message(msg)
+            send_discord_message(msg)
             conn.close()
             return False
 
@@ -116,7 +116,7 @@ class PortfolioManager:
         except Exception as e:
             error_msg = f"🚨 [嚴重錯誤] 寫入資料庫變更時發生異常: {e}。這可能導致資料不同步！"
             logging.error(error_msg)
-            send_line_push_message(error_msg)
+            send_discord_message(error_msg)
             conn.rollback()
             return False
             
@@ -169,7 +169,7 @@ class PortfolioManager:
         except Exception as e:
             error_msg = f"❌ [PortfolioManager] [ERROR] 淨額單送出失敗 (Delta: {delta}): {e}"
             logging.error(error_msg)
-            send_line_push_message(error_msg)
+            send_discord_message(error_msg)
             return False
 
     def reconcile_positions(self, contract_symbol: str):
@@ -238,7 +238,7 @@ class PortfolioManager:
                 f"⚠️ 請立即檢查券商 APP，可能有手動平倉或漏單發生。建議暫停自動交易並重新對齊數據庫部位。"
             )
             logging.critical(alert_msg)
-            send_line_push_message(alert_msg)
+            send_discord_message(alert_msg)
         else:
             logging.info(f"[PortfolioManager] ✅ 週期對帳成功 - {contract_symbol} 部位一致: {real_position} 口。")
 

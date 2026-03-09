@@ -52,7 +52,7 @@ from datetime import datetime
 import shioaji as sj
 from src.connection import Trader
 from src.processors.kline_maker import KLineMaker
-from src.line_notify import send_line_push_message
+from src.discord_notify import send_discord_message
 from src.db_logger import log_daily_equity
 from src.portfolio_manager import PortfolioManager
 
@@ -257,7 +257,7 @@ def main():
                     # 取得目前價格
                     price = latest_quote.get('close', latest_quote.get('price', 0))
                     
-                    # === LINE Notify ===
+                    # === Discord Notify ===
                     # 日盤開盤 (08:45)
                     if current_hm == "08:46" and not notified_open:
                         df_5m = maker_5m.get_dataframe()
@@ -271,7 +271,7 @@ def main():
                                 atr_val = f"{atr_series.iloc[-1]:.2f}"
                                 
                         msg_open = f"☀️ [日盤] 門神已就位！今日開盤價：{price}，ATR 波動率：{atr_val}，Body Filter 閾值已鎖定。"
-                        send_line_push_message(msg_open)
+                        send_discord_message(msg_open)
                         notified_open = True
                     
                     # 日盤收盤 (13:45)
@@ -294,7 +294,7 @@ def main():
                                 
                         pos_status_str = " | ".join(pos_status_list) if pos_status_list else "無"
                         msg_close = f"📊 [日盤] 今日任務結束。\n狀態：{pos_status_str}\n本日盈虧：{total_pnl:.1f} 點。"
-                        send_line_push_message(msg_close)
+                        send_discord_message(msg_close)
                         notified_close = True
                         
                         # --- Log Daily Equity to PostgreSQL ---
@@ -320,14 +320,14 @@ def main():
                     # 夜盤開盤 (15:00)
                     if current_hm == "15:01" and not notified_night_open:
                         msg_night_open = f"🌙 [夜盤] 門神已就位！夜盤開盤價：{price}，系統持續監控中。"
-                        send_line_push_message(msg_night_open)
+                        send_discord_message(msg_night_open)
                         notified_night_open = True
                         
                     # 夜盤收盤 (05:00)
                     if current_hm == "05:01" and not notified_night_close:
                         # Optional: Add night session PnL summary here if needed
                         msg_night_close = f"💤 [夜盤] 任務結束。狀態更新完畢，準備迎接日盤。"
-                        send_line_push_message(msg_night_close)
+                        send_discord_message(msg_night_close)
                         notified_night_close = True
                         
                     # Dynamic Status Dashboard Lookups

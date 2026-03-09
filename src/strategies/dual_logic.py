@@ -2,7 +2,7 @@ import logging
 import pandas as pd
 from datetime import datetime
 from .indicators import calculate_supertrend, calculate_ut_bot, calculate_atr
-from src.line_notify import send_line_push_message
+from src.discord_notify import send_discord_message
 from src.db_logger import log_trade_entry, log_trade_exit
 import shioaji as sj
 
@@ -117,7 +117,7 @@ class DualTimeframeStrategy:
                 msg = f"🎯 門神出擊！\n方向：做多 (LONG)\n點位：{self.entry_price}\n停損：{self.stop_loss:.1f}\n目前的 Body Ratio：{ratio}%"
                 
                 if "Backtest" not in self.name:
-                    send_line_push_message(msg)
+                    send_discord_message(msg)
                     
                     # Write to database (Trade Entry)
                     self.current_db_trade_id = log_trade_entry(
@@ -170,7 +170,7 @@ class DualTimeframeStrategy:
                 msg = f"🎯 門神出擊！\n方向：放空 (SHORT)\n點位：{self.entry_price}\n停損：{self.stop_loss:.1f}\n目前的 Body Ratio：{ratio}%"
                 
                 if "Backtest" not in self.name:
-                    send_line_push_message(msg)
+                    send_discord_message(msg)
                     
                     # Write to database (Trade Entry)
                     self.current_db_trade_id = log_trade_entry(
@@ -227,7 +227,7 @@ class DualTimeframeStrategy:
                             
                     if not order_success:
                         msg = f"⚠️ 【{self.name}】平多單委託被拒絕，系統將保留當前內部部位！\n出局原因：{exit_reason}\n價格：{current_price}"
-                        send_line_push_message(msg)
+                        send_discord_message(msg)
                         return
 
                 # 2. 成功後才清理內部狀態與回報交易紀錄
@@ -258,7 +258,7 @@ class DualTimeframeStrategy:
                     self.current_db_trade_id = -1
                     
                     msg = f"💸 門神平倉出局！\n出局原因：{exit_reason}\n出場點位：{current_price}\n損益點數：{pnl:.1f}"
-                    send_line_push_message(msg)
+                    send_discord_message(msg)
 
         elif self.is_short:
             self.lowest_price = min(self.lowest_price, current_price)
@@ -305,7 +305,7 @@ class DualTimeframeStrategy:
                             
                     if not order_success:
                         msg = f"⚠️ 【{self.name}】平空單委託被拒絕，系統將保留當前內部部位！\n出局原因：{exit_reason}\n價格：{current_price}"
-                        send_line_push_message(msg)
+                        send_discord_message(msg)
                         return
 
                 # 2. 成功後才清理內部狀態與回報交易紀錄
@@ -336,4 +336,4 @@ class DualTimeframeStrategy:
                     self.current_db_trade_id = -1
                     
                     msg = f"💸 門神平空單出局！\n出局原因：{exit_reason}\n出場點位：{current_price}\n損益點數：{pnl:.1f}"
-                    send_line_push_message(msg)
+                    send_discord_message(msg)

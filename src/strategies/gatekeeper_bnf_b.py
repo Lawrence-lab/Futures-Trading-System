@@ -2,7 +2,7 @@ import logging
 import pandas as pd
 from datetime import datetime
 from .indicators import calculate_sma, calculate_bias, calculate_atr
-from src.line_notify import send_line_push_message
+from src.discord_notify import send_discord_message
 from src.db_logger import log_trade_entry, log_trade_exit
 
 class GatekeeperBNFBStrategy:
@@ -143,7 +143,7 @@ class GatekeeperBNFBStrategy:
                         logging.info(log_msg)
                         
                         if "Backtest" not in self.name and "Opt" not in self.name:
-                            send_line_push_message(f"🚨 【{self.name}】逆勢摸底啟動！\n方向：做多 1 口\n點位：{self.entry_price}\n乖離率：{current_bias:.2f}%\n停損：{self.stop_loss}")
+                            send_discord_message(f"🚨 【{self.name}】逆勢摸底啟動！\n方向：做多 1 口\n點位：{self.entry_price}\n乖離率：{current_bias:.2f}%\n停損：{self.stop_loss}")
                             
                             self.current_db_trade_id = log_trade_entry(
                                 strategy_name=self.name,
@@ -192,7 +192,7 @@ class GatekeeperBNFBStrategy:
                         logging.info(log_msg)
                         
                         if "Backtest" not in self.name and "Opt" not in self.name:
-                            send_line_push_message(f"🚨 【{self.name}】逆勢摸頭啟動！\n方向：做空 1 口\n點位：{self.entry_price}\n乖離率：{current_bias:.2f}%\n停損：{self.stop_loss}")
+                            send_discord_message(f"🚨 【{self.name}】逆勢摸頭啟動！\n方向：做空 1 口\n點位：{self.entry_price}\n乖離率：{current_bias:.2f}%\n停損：{self.stop_loss}")
                             
                             self.current_db_trade_id = log_trade_entry(
                                 strategy_name=self.name,
@@ -222,7 +222,7 @@ class GatekeeperBNFBStrategy:
                 msg = f"🎯 [{self.name}] 達到 {self.partial_tp_points} 點目標！啟動多單保本與移動停利。\n目前價格: {current_price}\n停損移至: {self.stop_loss:.1f}"
                 logging.info(msg)
                 if "Backtest" not in self.name and "Opt" not in self.name:
-                    send_line_push_message(msg)
+                    send_discord_message(msg)
             
             # --- 檢查全數平倉條件 ---
             # 更新剩餘部位的移動停利軌道
@@ -265,7 +265,7 @@ class GatekeeperBNFBStrategy:
                 msg = f"🎯 [{self.name}] 達到 {self.partial_tp_points} 點目標！啟動空單保本與移動停利。\n目前價格: {current_price}\n停損移至: {self.stop_loss:.1f}"
                 logging.info(msg)
                 if "Backtest" not in self.name and "Opt" not in self.name:
-                    send_line_push_message(msg)
+                    send_discord_message(msg)
             
             # --- 檢查全數平倉條件 ---
             # 更新剩餘部位的移動停利軌道
@@ -312,7 +312,7 @@ class GatekeeperBNFBStrategy:
             
             if not order_success:
                 msg = f"⚠️ 【{self.name}】平倉委託被拒絕，系統將保留當前內部部位，請檢視環境與連線狀態！\n出局原因：{exit_reason}\n價格：{current_price}"
-                send_line_push_message(msg)
+                send_discord_message(msg)
                 return
 
         # 2. 實體單與資料庫更新成功後，才清理內部狀態與回報交易紀錄
@@ -343,4 +343,4 @@ class GatekeeperBNFBStrategy:
                 self.current_db_trade_id = -1
                 
             action_str = "全數平倉" if direction == "Long" else "空單全數回補"
-            send_line_push_message(f"💸 【{self.name}】{action_str}結案！\n原因：{exit_reason}\n出場點位：{current_price}\n此口損益結算：{final_pnl:.1f}")
+            send_discord_message(f"💸 【{self.name}】{action_str}結案！\n原因：{exit_reason}\n出場點位：{current_price}\n此口損益結算：{final_pnl:.1f}")
