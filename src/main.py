@@ -104,7 +104,8 @@ def main():
         # 定義行情儲存變數
         latest_quote = {}
 
-        # KLineMaker 初始化 (60分K & 1D K線)
+        # KLineMaker 初始化 (5分K, 60分K & 1D K線)
+        maker_5m = KLineMaker(timeframe=5)
         maker_60m = KLineMaker(timeframe=60)
         maker_1d = KLineMaker(timeframe=1440)
         
@@ -134,12 +135,14 @@ def main():
                     'open': 'first', 'high': 'max', 'low': 'min', 'close': 'last', 'volume': 'sum'
                 }
                 
+                df_5m_hist = df_1m.resample('5min', label='left', closed='left').apply(ohlc_dict).dropna().reset_index()
                 df_60m_hist = df_1m.resample('60min', label='left', closed='left').apply(ohlc_dict).dropna().reset_index()
                 df_1d_hist = df_1m.resample('1D', label='left', closed='left').apply(ohlc_dict).dropna().reset_index()
                 
+                maker_5m.load_historical_dataframe(df_5m_hist)
                 maker_60m.load_historical_dataframe(df_60m_hist)
                 maker_1d.load_historical_dataframe(df_1d_hist)
-                print(f"歷史資料載入完畢: 60M ({len(df_60m_hist)} 根), 1D ({len(df_1d_hist)} 根)")
+                print(f"歷史資料載入完畢: 5M ({len(df_5m_hist)} 根), 60M ({len(df_60m_hist)} 根), 1D ({len(df_1d_hist)} 根)")
             else:
                 print("⚠️ 永豐 API 未回傳歷史資料，系統將空手啟動收集 K 線。")
         except Exception as e:
@@ -147,15 +150,20 @@ def main():
         
         # 策略初始化
         from src.strategies.dual_logic import DualTimeframeStrategy
-        from src.strategies.gatekeeper_bnf_b import GatekeeperBNFBStrategy
+        from src.strategies.gatekeeper_bnf_b_5m import GatekeeperBNFB5mStrategy
         
         # 建立投資組合管理員
         portfolio = PortfolioManager(api=trader.api)
         
-        strategies = [
+        strategies_60m = [
             DualTimeframeStrategy(name="Gatekeeper-MXF-V1", portfolio=portfolio, contract=target_contract),
-            GatekeeperBNFBStrategy(name="Gatekeeper-BNF-B", portfolio=portfolio, contract=target_contract),
         ]
+        
+        strategies_5m = [
+            GatekeeperBNFB5mStrategy(name="Gatekeeper-BNF-B", portfolio=portfolio, contract=target_contract),
+        ]
+        
+        strategies = strategies_60m + strategies_5m
 
         # 定義行情 Callback
         def on_quote(exchange, quote):
@@ -176,20 +184,26 @@ def main():
             latest_quote.update(tick_data)
             
             # 更新 K 線
-            # 判斷是否為 Tick 資料 (含有 close 和 volume)
             if 'close' in tick_data and 'volume' in tick_data:
                 try:
-                    # 同時餵給 60m 與 1d Maker
+                    # 同時餵給 5m, 60m 與 1d Maker
                     is_new_1d = maker_1d.update_with_tick(tick_data)
                     is_new_60m = maker_60m.update_with_tick(tick_data)
+                    is_new_5m = maker_5m.update_with_tick(tick_data)
                     
+                    df_1d = maker_1d.get_dataframe()
+                    
+                    if is_new_5m:
+                        df_5m = maker_5m.get_dataframe()
+                        for strategy in strategies_5m:
+                            strategy.check_signals(df_5m, df_1d)
+                            
                     # 當 60m K 線完成時，進行策略判斷
                     if is_new_60m:
                         df_60m = maker_60m.get_dataframe()
-                        df_1d = maker_1d.get_dataframe()
                         
                         # 呼叫策略檢查訊號
-                        for strategy in strategies:
+                        for strategy in strategies_60m:
                             strategy.check_signals(df_60m, df_1d)
                         
                 except Exception as e:
