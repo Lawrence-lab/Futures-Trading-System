@@ -57,9 +57,9 @@ def main():
 
     # 3. Fetch Historical Data (1-minute bars)
     # kbars API: https://shioaji.github.io/shioaji/data/kbars/
-    print("Fetching historical data (Last 180 days)...")
+    print("Fetching historical data (Last 30 days for indicator warm-up)...")
     now = datetime.now()
-    start_date = (now - timedelta(days=180)).strftime('%Y-%m-%d')
+    start_date = (now - timedelta(days=30)).strftime('%Y-%m-%d')
     end_date = now.strftime('%Y-%m-%d')
     
     # Shioaji kbars returns a specific object, convert to DataFrame
@@ -219,7 +219,8 @@ def main():
 
     # 5. Simulation Loop
     print("Running simulation...")
-    portfolio = PortfolioManager(api=trader.api)
+    # Set portfolio=None to prevent backtest trades from being written to the real database
+    portfolio = None
     
     from src.strategies.gatekeeper_bnf_b import GatekeeperBNFBStrategy
     
