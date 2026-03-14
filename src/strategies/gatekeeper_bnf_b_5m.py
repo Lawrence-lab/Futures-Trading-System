@@ -202,9 +202,18 @@ class GatekeeperBNFB5mStrategy:
                             )
 
         # ====================
-        # 出場與風控邏輯 (Exit)
+        # 出場邏輯已被移至 check_exit_signals 去做 Tick 級檢測
         # ====================
-        elif self.is_long:
+
+    def check_exit_signals(self, current_price: float, current_time: datetime, current_sma: float, current_atr: float = 20.0):
+        """
+        Tick-level Check: 每一筆報價進來時，立即計算停損與停利條件。
+        不需等待 K 棒收尾。
+        """
+        if not self.is_long and not self.is_short:
+            return
+
+        if self.is_long:
             self.highest_price = max(self.highest_price, current_price)
             profit = current_price - self.entry_price
             

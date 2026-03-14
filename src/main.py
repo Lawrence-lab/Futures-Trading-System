@@ -208,6 +208,44 @@ def main():
             
             latest_quote.update(tick_data)
             
+            # === TICK-LEVEL EXIT CHECK ===
+            # 每當有新的報價進來（包含現價），立刻檢查是否觸發停損/移動停利
+            if 'close' in tick_data:
+                tick_price = float(tick_data['close'])
+                
+                # Check DualTimeframe (60m) Strategies
+                for strategy in strategies_60m:
+                    if strategy.is_long or strategy.is_short:
+                        # 嘗試取得最新的 ATR，若無則用預設值 20.0
+                        df_60m = maker_60m.get_dataframe()
+                        current_atr = 20.0
+                        if not df_60m.empty and 'atr' in df_60m.columns:
+                            current_atr = df_60m.iloc[-1]['atr']
+                        
+                        strategy.check_exit_signals(tick_price, now_tw, current_atr)
+
+                # Check GatekeeperBNFB (5m) Strategies
+                for strategy in strategies_5m:
+                    if strategy.is_long or strategy.is_short:
+                        df_5m = maker_5m.get_dataframe()
+                        current_sma = 0.0
+                        current_atr = 20.0
+                        
+                        # 從最新的 K棒 DataFrame 中計算出最新的 SMA 與 ATR
+                        if not df_5m.empty:
+                            from src.strategies.indicators import calculate_sma, calculate_atr
+                            sma_series = calculate_sma(df_5m, period=strategy.sma_period)
+                            if sma_series is not None and not sma_series.empty:
+                                current_sma = float(sma_series.iloc[-1])
+                                
+                            atr_series = calculate_atr(df_5m, period=14)
+                            if atr_series is not None and not atr_series.empty:
+                                current_atr = float(atr_series.iloc[-1])
+
+                        # 只有當我們有有效的 SMA 基準點時才執行檢查 (避免一開始沒資料時誤動作)
+                        if current_sma > 0:
+                            strategy.check_exit_signals(tick_price, now_tw, current_sma, current_atr)
+
             # 更新 K 線
             if 'close' in tick_data and 'volume' in tick_data:
                 try:
