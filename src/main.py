@@ -57,6 +57,23 @@ from src.db_logger import log_daily_equity
 from src.portfolio_manager import PortfolioManager
 
 
+def is_market_closed(dt: datetime) -> bool:
+    """
+    判斷是否為週末休市時間:
+    週六 05:05 後開始休市，直到週一 08:44 開盤前 (皆為台灣時間)。
+    """
+    weekday = dt.weekday()
+    hm = dt.strftime("%H:%M")
+    
+    if weekday == 5 and hm >= "05:05":
+        return True
+    if weekday == 6:
+        return True
+    if weekday == 0 and hm < "08:45":
+        return True
+        
+    return False
+
 def main():
     """系統主進入點"""
     import subprocess
@@ -167,6 +184,14 @@ def main():
 
         # 定義行情 Callback
         def on_quote(exchange, quote):
+            import pytz
+            tw_tz = pytz.timezone('Asia/Taipei')
+            now_tw = datetime.now(tw_tz)
+            
+            # 週末休市不處理任何行情
+            if is_market_closed(now_tw):
+                return
+                
             # Shioaji quote object usually provides to_dict() or dict()
             tick_data = {}
             if hasattr(quote, 'to_dict'):
@@ -251,11 +276,22 @@ def main():
         notified_night_close = False
         last_date = ""
         last_reconciliation_time = 0
+        last_weekend_log_time = 0
 
         while True:
             try:
                 # Use Asia/Taipei timezone explicitly to avoid UTC offset issues on cloud servers
                 now_tw = datetime.now(tw_tz)
+                
+                # 判斷是否為週末休市 (如果休市，則跳過主要監測迴圈並定時輸出休市日誌)
+                if is_market_closed(now_tw):
+                    current_unix_time = time.time()
+                    if current_unix_time - last_weekend_log_time >= 1800: # 每 30 分鐘印一次
+                        print(f"[{now_tw.strftime('%Y-%m-%d %H:%M:%S')}] 週末休市中，系統處於待命狀態...")
+                        last_weekend_log_time = current_unix_time
+                    time.sleep(60)
+                    continue
+                    
                 current_time = now_tw.strftime("%Y-%m-%d %H:%M:%S")
                 current_date = now_tw.strftime("%Y-%m-%d")
                 current_hm = now_tw.strftime("%H:%M")
