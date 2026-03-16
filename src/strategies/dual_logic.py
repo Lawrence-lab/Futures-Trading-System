@@ -1,7 +1,7 @@
 import logging
 import pandas as pd
 from datetime import datetime
-from .indicators import calculate_supertrend, calculate_ut_bot, calculate_atr
+from .indicators import calculate_supertrend, calculate_ut_bot, calculate_atr, calculate_adx
 from src.discord_notify import send_discord_message
 from src.db_logger import log_trade_entry, log_trade_exit
 import shioaji as sj
@@ -31,9 +31,14 @@ class DualTimeframeStrategy:
         
         # Parameters
         self.be_threshold = 150.0  # 保本觸發點 (Optimized: 150)
-        self.trailing_stop_drop = 200.0 # 折返停利點 (Optimized from backtest sweep)
-        self.ut_bot_key = 4.0 # UT Bot Sensitivity (Optimized from backtest sweep)
-        self.body_filter = 100.0 # Candle Body Filter (Optimized: 100)
+        self.trailing_atr_mult = 1.5 # 移動停利倍數 (Optimized from backtest sweep)
+        self.ut_bot_key = 3.5 # UT Bot Sensitivity (Optimized from backtest sweep)
+        
+        # 趨勢動能濾網 (ADX Filter)
+        self.adx_threshold = 25.0 # 只有 ADX > 此數值才允許進場
+        
+        # 移除高門檻的實體濾網，讓趨勢一出來就進場
+        self.body_filter = 0.0
 
     def check_signals(self, df_60m, df_1d, precalc_bullish_1d=None, precalc_signal_60m=None):
         if df_60m.empty or df_1d.empty: return
@@ -56,26 +61,30 @@ class DualTimeframeStrategy:
         current_time = current_bar.get('datetime', datetime.now())
         
         # Calculate ATR for dynamic stop loss
-        # ATR also needs to be efficient. For backtest, we can accept re-calc or pre-calc.
-        # Since ATR calc is fast (rolling window), we can keep it or pre-calc.
-        # Let's keep it simple for now, ATR on slice is okay-ish, or optimize later.
-        # But for max speed, better to just take it from the row if available.
-        # Assuming df_60m has 'atr' if pre-calculated.
-        
         if 'atr' in df_60m.columns:
              current_atr = current_bar['atr']
         else:
              atr_series = calculate_atr(df_60m, period=10)
              current_atr = atr_series.iloc[-1] if not atr_series.empty else 20.0
+             
+        # Calculate ADX for trend filtering
+        if 'adx' in df_60m.columns:
+             current_adx = current_bar['adx']
+        else:
+             adx_series = calculate_adx(df_60m, period=14)
+             current_adx = adx_series.iloc[-1] if (adx_series is not None and not adx_series.empty) else 0.0
         
         # Entry Logic
         if not self.is_long and not self.is_short:
-            # Body Filter: Close - Open > 60 (For Long), Open - Close > 60 (For Short)
-            bullish_body = (current_price - current_open) > self.body_filter
-            bearish_body = (current_open - current_price) > self.body_filter
+            # Body Filter 已經設為 0，只要大於等於 0 即可 (即收紅K / 收黑K)
+            bullish_body = (current_price - current_open) >= self.body_filter
+            bearish_body = (current_open - current_price) >= self.body_filter
+            
+            # Trend Momentum Filter (ADX)
+            has_momentum = current_adx > self.adx_threshold
             
             # Long Entry
-            if is_bullish_1d and signal_60m == "Buy" and bullish_body:
+            if is_bullish_1d and signal_60m == "Buy" and bullish_body and has_momentum:
                 # 1. 嘗試發送實體單並登記虛擬部位
                 order_success = True
                 if self.portfolio and self.contract:
@@ -114,9 +123,9 @@ class DualTimeframeStrategy:
                 body = current_price - current_open
                 candle_range = float(current_bar['high']) - float(current_bar['low'])
                 ratio = round((body / candle_range * 100), 2) if candle_range > 0 else 0
-                msg = f"🎯 門神出擊！\n方向：做多 (LONG)\n點位：{self.entry_price}\n停損：{self.stop_loss:.1f}\n目前的 Body Ratio：{ratio}%"
+                msg = f"🎯 門神出擊！\n方向：做多 (LONG)\n點位：{self.entry_price}\n停損：{self.stop_loss:.1f}\n目前的 ADX：{current_adx:.1f}\n目前的 Body Ratio：{ratio}%"
                 
-                if "Backtest" not in self.name:
+                if "Backtest" not in self.name and "Opt" not in self.name:
                     send_discord_message(msg)
                     
                     # Write to database (Trade Entry)
@@ -128,7 +137,7 @@ class DualTimeframeStrategy:
                     )
 
             # Short Entry
-            elif not is_bullish_1d and signal_60m == "Sell" and bearish_body:
+            elif not is_bullish_1d and signal_60m == "Sell" and bearish_body and has_momentum:
                 # 1. 嘗試發送實體單並登記虛擬部位
                 order_success = True
                 if self.portfolio and self.contract:
@@ -167,9 +176,9 @@ class DualTimeframeStrategy:
                 body = current_open - current_price
                 candle_range = float(current_bar['high']) - float(current_bar['low'])
                 ratio = round((body / candle_range * 100), 2) if candle_range > 0 else 0
-                msg = f"🎯 門神出擊！\n方向：放空 (SHORT)\n點位：{self.entry_price}\n停損：{self.stop_loss:.1f}\n目前的 Body Ratio：{ratio}%"
+                msg = f"🎯 門神出擊！\n方向：放空 (SHORT)\n點位：{self.entry_price}\n停損：{self.stop_loss:.1f}\n目前的 ADX：{current_adx:.1f}\n目前的 Body Ratio：{ratio}%"
                 
-                if "Backtest" not in self.name:
+                if "Backtest" not in self.name and "Opt" not in self.name:
                     send_discord_message(msg)
                     
                     # Write to database (Trade Entry)
@@ -194,28 +203,37 @@ class DualTimeframeStrategy:
             self.highest_price = max(self.highest_price, current_price)
             profit = current_price - self.entry_price
             
-            # Excel: 保本機制
+            # 保本機制：獲利達標後，停損「至少」要移到成本價
             if not self.break_even_triggered and profit >= self.be_threshold:
-                self.stop_loss = self.entry_price
+                # 只在停損小於成本時才上移成保本，避免降低已經拉上去的 Trailing Stop
+                if self.stop_loss < self.entry_price:
+                    self.stop_loss = self.entry_price
                 self.break_even_triggered = True
-                logging.info(f"[{self.name}] [RISK] 多單啟動保本 | 時間: {current_time} | 目前價格: {current_price} | 停損移至成本: {self.stop_loss}")
+                logging.info(f"[{self.name}] [RISK] 多單啟動保本 | 時間: {current_time} | 目前價格: {current_price} | 停損至少為成本: {self.entry_price}")
             
+            # 移動停利機制 (Trailing ATR): 隨著最高價不斷創高，停損價跟著往上推
+            # 只有在獲利超過保本點後才開始收緊移動停損 (因為前期的防守靠 2*ATR 固定)
+            if self.break_even_triggered:
+                potential_sl = self.highest_price - (self.trailing_atr_mult * current_atr)
+                # 停損只能往上移，不能往下掉
+                self.stop_loss = max(self.stop_loss, potential_sl)
+
             # Check Exit Conditions
             exit_reason = None
             
-            # Excel: 折返點數停利
-            if profit >= self.be_threshold:
-                if current_price <= (self.highest_price - self.trailing_stop_drop):
-                    exit_reason = "Trailing Stop"
-            
-            # Hard Stop Loss
+            # Hard Stop Loss / Trailing Stop Loss
             if current_price <= self.stop_loss:
-                exit_reason = "Stop Loss" if not self.break_even_triggered else "Break Even"
+                if current_price > self.entry_price:
+                    exit_reason = "Trailing Stop (ATR)"
+                elif self.break_even_triggered:
+                    exit_reason = "Break Even"
+                else:
+                    exit_reason = "Stop Loss"
             
             if exit_reason:
                 # 1. 嘗試發送實體平倉單
                 order_success = True
-                if "Backtest" not in self.name:
+                if "Backtest" not in self.name and "Opt" not in self.name:
                     if self.portfolio and self.contract:
                         try:
                             # 平倉，虛擬部位歸 0
@@ -255,7 +273,7 @@ class DualTimeframeStrategy:
                 })
                 
                 # Update database (Trade Exit)
-                if self.current_db_trade_id != -1 and "Backtest" not in self.name:
+                if self.current_db_trade_id != -1 and "Backtest" not in self.name and "Opt" not in self.name:
                     log_trade_exit(
                         trade_id=self.current_db_trade_id,
                         exit_price=float(current_price),
@@ -272,28 +290,36 @@ class DualTimeframeStrategy:
             self.lowest_price = min(self.lowest_price, current_price)
             profit = self.entry_price - current_price # Short PnL is inverted
             
-            # Excel: 保本機制
+            # 保本機制：獲利達標後，停損「至少」要壓到成本價
             if not self.break_even_triggered and profit >= self.be_threshold:
-                self.stop_loss = self.entry_price
+                # 只在停損大於成本時才下壓成保本，避免影響已經被推下去的 Trailing Stop
+                if self.stop_loss > self.entry_price:
+                    self.stop_loss = self.entry_price
                 self.break_even_triggered = True
-                logging.info(f"[{self.name}] [RISK] 空單啟動保本 | 時間: {current_time} | 目前價格: {current_price} | 停損移至成本: {self.stop_loss}")
+                logging.info(f"[{self.name}] [RISK] 空單啟動保本 | 時間: {current_time} | 目前價格: {current_price} | 停損至少為成本: {self.entry_price}")
             
+            # 移動停利機制 (Trailing ATR): 隨著最低價不斷創低，停損價跟著往下壓
+            if self.break_even_triggered:
+                potential_sl = self.lowest_price + (self.trailing_atr_mult * current_atr)
+                # 停損只能往下壓，不能往上翹
+                self.stop_loss = min(self.stop_loss, potential_sl)
+
             # Check Exit Conditions
             exit_reason = None
             
-            # Excel: 折返點數停利 (反彈)
-            if profit >= self.be_threshold:
-                if current_price >= (self.lowest_price + self.trailing_stop_drop):
-                    exit_reason = "Trailing Stop"
-            
-            # Hard Stop Loss (Touched upper band)
+            # Hard Stop Loss / Trailing Stop Loss (Touched upper band)
             if current_price >= self.stop_loss:
-                exit_reason = "Stop Loss" if not self.break_even_triggered else "Break Even"
+                if current_price < self.entry_price:
+                    exit_reason = "Trailing Stop (ATR)"
+                elif self.break_even_triggered:
+                    exit_reason = "Break Even"
+                else:
+                    exit_reason = "Stop Loss"
             
             if exit_reason:
                 # 1. 嘗試發送實體平倉單
                 order_success = True
-                if "Backtest" not in self.name:
+                if "Backtest" not in self.name and "Opt" not in self.name:
                     if self.portfolio and self.contract:
                         try:
                             # 平倉，虛擬部位歸 0
@@ -333,7 +359,7 @@ class DualTimeframeStrategy:
                 })
                 
                 # Update database (Trade Exit)
-                if self.current_db_trade_id != -1 and "Backtest" not in self.name:
+                if self.current_db_trade_id != -1 and "Backtest" not in self.name and "Opt" not in self.name:
                     log_trade_exit(
                         trade_id=self.current_db_trade_id,
                         exit_price=float(current_price),

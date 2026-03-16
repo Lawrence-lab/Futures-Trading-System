@@ -11,7 +11,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.connection import Trader
 from src.strategies.dual_logic import DualTimeframeStrategy
-from src.strategies.indicators import calculate_atr, calculate_supertrend
+from src.strategies.indicators import calculate_atr, calculate_supertrend, calculate_adx
 
 # Disable Line notifications during backtest to prevent spam
 os.environ["DISABLE_LINE_NOTIFY"] = "true"
@@ -72,6 +72,7 @@ def get_historical_data(trader, contract, days=180):
 
     df_1d['is_uptrend'] = get_supertrend_series(df_1d)
     df_60m['atr'] = calculate_atr(df_60m)
+    df_60m['adx'] = calculate_adx(df_60m, period=14)
     
     return df_60m, df_1d
 
@@ -107,12 +108,13 @@ def get_ut_bot_series(df, key_value=2.0, atr_period=10):
     
     return pd.Series(signal, index=df.index)
 
-def run_simulation(df_60m, df_1d, ut_key, trailing_drop):
+def run_simulation(df_60m, df_1d, ut_key, atr_mult, adx_thresh):
     strategy = DualTimeframeStrategy(name="Gatekeeper-MXF-V1_Opt", portfolio=None, contract=None)
     
     # Apply parameters
     strategy.ut_bot_key = ut_key
-    strategy.trailing_stop_drop = trailing_drop
+    strategy.trailing_atr_mult = atr_mult
+    strategy.adx_threshold = adx_thresh
     
     # Pre-calc UT-BOT for this specific key
     df_60m = df_60m.copy()
@@ -130,6 +132,21 @@ def run_simulation(df_60m, df_1d, ut_key, trailing_drop):
         
         is_bull_1d = False if idx_safe < 0 else df_1d['is_uptrend'].iloc[idx_safe]
 
+        current_close = float(df_60m.iloc[i]['close'])
+        current_high = float(df_60m.iloc[i]['high'])
+        current_low = float(df_60m.iloc[i]['low'])
+        current_atr = float(df_60m.iloc[i]['atr'])
+        
+        # 1. 模擬此 60m K 棒的日內波動，檢查是否觸發停損/停利
+        if strategy.is_long:
+            strategy.check_exit_signals(current_high, current_time, current_atr)
+            if strategy.is_long: # 如果高點沒出場，再測低點
+                strategy.check_exit_signals(current_low, current_time, current_atr)
+        elif strategy.is_short:
+            strategy.check_exit_signals(current_low, current_time, current_atr)
+            if strategy.is_short: # 如果低點沒出場，再測高點
+                strategy.check_exit_signals(current_high, current_time, current_atr)
+
         df_60m_row = df_60m.iloc[[i]]
         df_1d_dummy = df_1d.iloc[[0]] 
         
@@ -139,6 +156,9 @@ def run_simulation(df_60m, df_1d, ut_key, trailing_drop):
             precalc_bullish_1d=is_bull_1d, 
             precalc_signal_60m=sig_60m
         )
+        
+        # 保險起見，收盤價再檢查一次出場
+        strategy.check_exit_signals(current_close, current_time, current_atr)
             
     trades = strategy.trades
     total_trades = len(trades)
@@ -175,44 +195,48 @@ def main():
     # UT Bot Key 從 2.5 到 4.5
     ut_keys = [2.5, 3.0, 3.5, 4.0, 4.5]
     
-    # 移動停利折返點數 從 50 到 200
-    trailing_drops = [50, 100, 150, 200]
+    # 移動停利 ATR 倍數 測試
+    atr_mults = [1.5, 2.0, 2.5, 3.0]
+    
+    # ADX 趨勢強度門檻 測試
+    adx_threshs = [15.0, 20.0, 25.0, 30.0]
     
     results = []
-    total_combinations = len(ut_keys) * len(trailing_drops)
+    total_combinations = len(ut_keys) * len(atr_mults) * len(adx_threshs)
     current_idx = 1
     
-    print("-" * 65)
-    print(f"{'UT-Bot Key':>10} | {'Trail Drop':>10} | {'Trades':>8} | {'Win Rate %':>12} | {'Total PnL':>10}")
-    print("-" * 65)
+    print("-" * 75)
+    print(f"{'UT-Bot Key':>10} | {'ATR Mult':>10} | {'ADX Thr':>8} | {'Trades':>8} | {'Win Rate %':>12} | {'Total PnL':>10}")
+    print("-" * 75)
 
-    for ut_k, t_drop in itertools.product(ut_keys, trailing_drops):
+    for ut_k, atr_m, adx_t in itertools.product(ut_keys, atr_mults, adx_threshs):
         sys.stdout.write(f"\rEvaluating {current_idx}/{total_combinations}...")
         sys.stdout.flush()
         
-        trades_count, win_rate, pnl = run_simulation(df_60m, df_1d, ut_k, t_drop)
+        trades_count, win_rate, pnl = run_simulation(df_60m, df_1d, ut_k, atr_m, adx_t)
         
         results.append({
             'UT_Key': ut_k,
-            'Trail_Drop': t_drop,
+            'ATR_Mult': atr_m,
+            'ADX_Thr': adx_t,
             'Trades': trades_count,
             'Win_Rate': win_rate,
             'PnL': pnl
         })
         current_idx += 1
         
-    print("\n" + "-" * 65)
+    print("\n" + "-" * 75)
     
     res_df = pd.DataFrame(results)
     res_df = res_df.sort_values(by='PnL', ascending=False).reset_index(drop=True)
     
     for idx, row in res_df.iterrows():
-        print(f"{row['UT_Key']:>10.1f} | {row['Trail_Drop']:>10.0f} | {int(row['Trades']):>8d} | {row['Win_Rate']:>11.2f}% | {row['PnL']:>10.1f}")
+        print(f"{row['UT_Key']:>10.1f} | {row['ATR_Mult']:>10.1f} | {row['ADX_Thr']:>8.1f} | {int(row['Trades']):>8d} | {row['Win_Rate']:>11.2f}% | {row['PnL']:>10.1f}")
 
     best_setup = res_df.iloc[0]
-    print("-" * 65)
+    print("-" * 75)
     # Fix encoding issue for Windows CMD
-    print(f"Best MXF Setup: UT Key {best_setup['UT_Key']}, Trailing Drop {int(best_setup['Trail_Drop'])} pts")
+    print(f"Best MXF Setup: UT Key {best_setup['UT_Key']}, ATR Mult {best_setup['ATR_Mult']}x, ADX Thr {best_setup['ADX_Thr']}")
     print(f"=> Expected PnL: {best_setup['PnL']}, Trades: {int(best_setup['Trades'])}")
 
 if __name__ == "__main__":
