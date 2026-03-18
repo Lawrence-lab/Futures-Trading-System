@@ -111,11 +111,28 @@ def main():
             if c.code[-2:] not in ["R1", "R2"] # 排除跨月價差單
         ]
         
-        if not tmf_contracts:
-            print("找不到 TMF 合約，請確認 API 連線或合約下載狀態。")
+        import pytz
+        tw_tz = pytz.timezone('Asia/Taipei')
+        now_tw = datetime.now(tw_tz)
+        current_date_str = now_tw.strftime("%Y/%m/%d")
+        current_hm_str = now_tw.strftime("%H:%M")
+
+        valid_contracts = []
+        for c in tmf_contracts:
+            if hasattr(c, 'delivery_date') and getattr(c, 'delivery_date'):
+                if c.delivery_date < current_date_str:
+                    continue
+                if c.delivery_date == current_date_str and current_hm_str >= "13:30":
+                    continue
+            valid_contracts.append(c)
+
+        if not valid_contracts:
+            print("找不到有效的 TMF 合約 (可能全部已到期)，請確認。")
             sys.exit(1)
             
-        target_contract = tmf_contracts[0]
+        # 確保照到期日排序
+        valid_contracts.sort(key=lambda x: getattr(x, 'delivery_date', '9999/99/99'))
+        target_contract = valid_contracts[0]
         print(f"鎖定合約: {target_contract.name} ({target_contract.code})")
 
         # 定義行情儲存變數
