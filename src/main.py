@@ -301,10 +301,15 @@ def main():
         trader.api.quote.set_on_bidask_fop_v1_callback(on_quote)
 
         # 訂閱行情
-        print(f"訂閱 {target_contract.code} 即時行情 (Tick & BidAsk)...")
+        print(f"訂閱 {target_contract.code} 即時行情 (Tick & BidAsk)...", flush=True)
         trader.api.quote.subscribe(
             target_contract, 
-            quote_type=[sj.constant.QuoteType.Tick, sj.constant.QuoteType.BidAsk],
+            quote_type=sj.constant.QuoteType.Tick,
+            version=sj.constant.QuoteVersion.v1
+        )
+        trader.api.quote.subscribe(
+            target_contract, 
+            quote_type=sj.constant.QuoteType.BidAsk,
             version=sj.constant.QuoteVersion.v1
         )
 
