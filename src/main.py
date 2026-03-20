@@ -222,6 +222,13 @@ def main():
                 except:
                     # print(f"DEBUG: Unknown quote type: {type(quote)}")
                     return
+
+            # 如果是 BidAsk 報價 (沒有 close)，透過買賣報價中位數補齊 close 以免監控畫面停滯
+            if 'bid_price' in tick_data and 'ask_price' in tick_data:
+                bids = tick_data.get('bid_price', [])
+                asks = tick_data.get('ask_price', [])
+                if bids and asks and len(bids) > 0 and len(asks) > 0:
+                    tick_data['close'] = (float(bids[0]) + float(asks[0])) / 2.0
             
             latest_quote.update(tick_data)
             
@@ -294,9 +301,12 @@ def main():
         trader.api.quote.set_on_bidask_fop_v1_callback(on_quote)
 
         # 訂閱行情
-        print(f"訂閱 {target_contract.code} 即時行情...")
-        trader.api.quote.subscribe(target_contract, quote_type=sj.constant.QuoteType.Tick)
-        trader.api.quote.subscribe(target_contract, quote_type=sj.constant.QuoteType.BidAsk)
+        print(f"訂閱 {target_contract.code} 即時行情 (Tick & BidAsk)...")
+        trader.api.quote.subscribe(
+            target_contract, 
+            quote_type=[sj.constant.QuoteType.Tick, sj.constant.QuoteType.BidAsk],
+            version=sj.constant.QuoteVersion.v1
+        )
 
         # Keep the program running and print quote every 1 minute
         print("系統運行中，按 Ctrl+C 停止...")
