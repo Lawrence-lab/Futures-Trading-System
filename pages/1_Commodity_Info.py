@@ -101,6 +101,12 @@ if result is not None:
     
     st.subheader(f"最新收盤價: {current_price:,.0f}")
     
+    # 判斷多空方向 (以日 K 月線 20MA 為準)
+    if not pd.isna(d_ma20):
+        trend_status = "多方 🟢" if current_price >= d_ma20 else "空方 🔴"
+        st.markdown(f"**【大局方向】 (以月線為準)**: 目前價格位於月線之{'上' if current_price >= d_ma20 else '下'}，趨勢偏向 **{trend_status}**。")
+    
+    
     # 計算乖離率 Bias = (Price - MA) / MA * 100
     def calc_bias(price, ma):
         if pd.isna(ma) or ma == 0: return "N/A"
