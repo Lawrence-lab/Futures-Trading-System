@@ -185,12 +185,14 @@ def main():
         # 策略初始化
         from src.strategies.dual_logic import DualTimeframeStrategy
         from src.strategies.gatekeeper_bnf_b_5m import GatekeeperBNFB5mStrategy
+        from src.strategies.notify_60ma import Notify60maStrategy
         
         # 建立投資組合管理員
         portfolio = PortfolioManager(api=trader.api)
         
         strategies_60m = [
             DualTimeframeStrategy(name="Gatekeeper-MXF-V1", portfolio=portfolio, contract=target_contract),
+            Notify60maStrategy(name="Notify_60MA_Crossover", portfolio=portfolio, contract=target_contract),
         ]
         
         strategies_5m = [
