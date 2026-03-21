@@ -41,6 +41,9 @@ def fetch_and_calculate_ma():
         if df.empty:
             return None
             
+        # 統一轉為小寫，避免 Shioaji 的欄位大小寫不一致導致 KeyError
+        df.columns = [col.lower() for col in df.columns]
+        
         df['ts'] = pd.to_datetime(df['ts'])
         df.set_index('ts', inplace=True)
         
