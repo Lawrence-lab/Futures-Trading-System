@@ -487,7 +487,8 @@ def main():
                         else:
                             pos_status = "EMPTY"
                             
-                        print(f"   -> [{strategy.name}] Position: {pos_status} | Entry: {strategy.entry_price}")
+                        entry_p = getattr(strategy, 'entry_price', 0.0)
+                        print(f"   -> [{strategy.name}] Position: {pos_status} | Entry: {entry_p}")
                     
                 else:
                     # Dashboard Output (No Tick State)

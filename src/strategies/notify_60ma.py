@@ -21,6 +21,7 @@ class Notify60maStrategy:
         # 通知型策略永遠不持有部位
         self.is_long = False
         self.is_short = False
+        self.entry_price = 0.0
         self.trades = []
 
     def check_signals(self, df_60m, df_1d=None):
