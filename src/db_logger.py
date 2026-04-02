@@ -16,7 +16,7 @@ def get_db_connection():
         logging.error(f"❌ Database connection failed: {e}")
         return None
 
-def log_trade_entry(strategy_name: str, side: str, entry_price: float, entry_time) -> int:
+def log_trade_entry(strategy_name: str, side: str, entry_price: float, entry_time, entry_reason: str = "") -> int:
     """Logs the entry of a trade to the trade_history table and returns the inserted ID."""
     conn = get_db_connection()
     if not conn: return -1
@@ -26,11 +26,11 @@ def log_trade_entry(strategy_name: str, side: str, entry_price: float, entry_tim
         cursor = conn.cursor()
         cursor.execute(
             """
-            INSERT INTO trade_history (strategy_name, side, entry_price, entry_time, status)
-            VALUES (%s, %s, %s, %s, 'Open')
+            INSERT INTO trade_history (strategy_name, side, entry_price, entry_time, entry_reason, status)
+            VALUES (%s, %s, %s, %s, %s, 'Open')
             RETURNING id;
             """,
-            (strategy_name, side, entry_price, entry_time)
+            (strategy_name, side, entry_price, entry_time, entry_reason)
         )
         trade_id = cursor.fetchone()[0]
         conn.commit()

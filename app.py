@@ -108,7 +108,7 @@ try:
     # --- 顯示詳細資料表 ---
     st.subheader("📋 歷史交易紀錄 (近 50 筆)")
     df_trades = pd.read_sql("""
-        SELECT id, strategy_name, side, entry_price, entry_time, exit_price, exit_time, pnl_points, status
+        SELECT id, strategy_name, side, entry_price, entry_time, entry_reason, exit_price, exit_time, exit_reason, pnl_points, status
         FROM trade_history
         ORDER BY id DESC
         LIMIT 50;

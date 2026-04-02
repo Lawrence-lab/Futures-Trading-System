@@ -149,7 +149,8 @@ class GatekeeperBNFBStrategy:
                                 strategy_name=self.name,
                                 side="Buy",
                                 entry_price=float(self.entry_price),
-                                entry_time=current_time
+                                entry_time=current_time,
+                                entry_reason=f"逆勢摸底多單 | Bias: {current_bias:.2f}%"
                             )
                 else:
                     # 空頭趨勢 -> 只做空 (摸頭)
@@ -198,7 +199,8 @@ class GatekeeperBNFBStrategy:
                                 strategy_name=self.name,
                                 side="Sell",
                                 entry_price=float(self.entry_price),
-                                entry_time=current_time
+                                entry_time=current_time,
+                                entry_reason=f"逆勢摸頭空單 | Bias: {current_bias:.2f}%"
                             )
 
         # ====================

@@ -17,8 +17,10 @@ CREATE TABLE IF NOT EXISTS trade_history (
     side VARCHAR(10),        -- 'Buy' 或 'Sell'
     entry_price NUMERIC,     -- 進場價
     entry_time TIMESTAMP,    -- 進場時間
+    entry_reason VARCHAR(200),-- 進場原因
     exit_price NUMERIC,      -- 出場價
     exit_time TIMESTAMP,     -- 出場時間
+    exit_reason VARCHAR(200),-- 出場原因
     pnl_points NUMERIC,      -- 損益點數
     status VARCHAR(20)       -- 'Open' 或 'Closed'
 );
@@ -54,9 +56,16 @@ try:
     print("正在建立 equity_logs 表格...")
     cursor.execute(create_equity_logs_sql)
     
+    print("正在檢查並升級 trade_history 結構 (加入 entry_reason)...")
+    try:
+        cursor.execute("ALTER TABLE trade_history ADD COLUMN IF NOT EXISTS entry_reason VARCHAR(200);")
+    except psycopg2.Error as e:
+        print(f"Warning: 無法新增 entry_reason 欄位 (可能已存在或權限不足): {e}")
+        conn.rollback()
+
     print("正在檢查並升級 trade_history 結構 (加入 exit_reason)...")
     try:
-        cursor.execute("ALTER TABLE trade_history ADD COLUMN IF NOT EXISTS exit_reason VARCHAR(100);")
+        cursor.execute("ALTER TABLE trade_history ADD COLUMN IF NOT EXISTS exit_reason VARCHAR(200);")
     except psycopg2.Error as e:
         print(f"Warning: 無法新增 exit_reason 欄位 (可能已存在或權限不足): {e}")
         conn.rollback() # Rollback the failed ALTER, but continue with the rest

@@ -133,7 +133,8 @@ class DualTimeframeStrategy:
                         strategy_name=self.name,
                         side="Buy",
                         entry_price=float(self.entry_price),
-                        entry_time=current_time
+                        entry_time=current_time,
+                        entry_reason=f"順勢做多 | ADX: {current_adx:.1f} | Body: {ratio}%"
                     )
 
             # Short Entry
@@ -186,7 +187,8 @@ class DualTimeframeStrategy:
                         strategy_name=self.name,
                         side="Sell",
                         entry_price=float(self.entry_price),
-                        entry_time=current_time
+                        entry_time=current_time,
+                        entry_reason=f"順勢放空 | ADX: {current_adx:.1f} | Body: {ratio}%"
                     )
 
         # Exit / Risk Management Logic moved to `check_exit_signals`
