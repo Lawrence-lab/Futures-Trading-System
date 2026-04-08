@@ -74,6 +74,21 @@ def is_market_closed(dt: datetime) -> bool:
         
     return False
 
+def is_pre_market(dt: datetime) -> bool:
+    """
+    判斷是否為盤前試撮時間 (不處理該時段的模擬撮合報價):
+    日盤: 08:30:00 ~ 08:44:59
+    夜盤: 14:50:00 ~ 14:59:59
+    """
+    hm = dt.strftime("%H:%M:%S")
+    
+    if "08:30:00" <= hm <= "08:44:59":
+        return True
+    if "14:50:00" <= hm <= "14:59:59":
+        return True
+        
+    return False
+
 def main():
     """系統主進入點"""
     import subprocess
@@ -209,6 +224,10 @@ def main():
             
             # 週末休市不處理任何行情
             if is_market_closed(now_tw):
+                return
+                
+            # 盤前試撮時間不處理任何模擬報價，避免導致指標失真或誤觸發進出訊號
+            if is_pre_market(now_tw):
                 return
                 
             # Shioaji quote object usually provides to_dict() or dict()
