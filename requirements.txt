@@ -1,4 +1,4 @@
-﻿shioaji
+shioaji
 python-dotenv
 pydantic
 pydantic-settings
@@ -10,3 +10,4 @@ pandas
 psycopg2-binary
 streamlit
 pytz
+kgisuperpy
