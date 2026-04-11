@@ -1,7 +1,4 @@
 #!/bin/bash
-echo "🚀 [start.sh] Ensuring kgisuperpy is installed..."
-pip install kgisuperpy==2.0.3
-
 echo "🚀 [start.sh] Starting background worker for trading strategy..."
 python src/main.py &
 

@@ -51,31 +51,6 @@ import time
 from datetime import datetime
 import shioaji as sj
 from src.connection import Trader
-
-# --- Zeabur Cache Bypass: Force dynamic installation of KGI API ---
-import subprocess
-import sys
-try:
-    import kgisuperpy as kgi
-except ImportError:
-    print("👉 [Auto-Install] kgisuperpy not found. Installing dynamically...", flush=True)
-    try:
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "kgisuperpy==2.0.3"])
-    except subprocess.CalledProcessError:
-        print("👉 [Auto-Install] Standard install failed (likely kaleido dependency on Linux/ARM). Falling back to --no-deps...", flush=True)
-        # Install kgisuperpy without dependencies
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "kgisuperpy==2.0.3", "--no-deps"])
-        # Manually install required dependencies excluding the broken kaleido package
-        deps = [
-            "matplotlib", "seaborn", "IPython", "cryptography", 
-            "websocket-client", "dash", "tqdm", "paramiko", 
-            "numba", "diskcache", "plotly==5.9.0"
-        ]
-        subprocess.check_call([sys.executable, "-m", "pip", "install"] + deps)
-        
-    import kgisuperpy as kgi
-# ------------------------------------------------------------------
-from dotenv import load_dotenv
 from src.processors.kline_maker import KLineMaker
 from src.discord_notify import send_discord_message
 from src.db_logger import log_daily_equity
@@ -133,45 +108,7 @@ def main():
     except Exception as e:
         print(f"⚠️ 無法啟動 Streamlit: {e}", flush=True)
 
-    print("初始化 KGI 報價系統...")
-    load_dotenv()
-    kgi_id = os.environ.get("KGI_ID")
-    kgi_pwd = os.environ.get("KGI_PASSWORD")
-    if not kgi_id or not kgi_pwd:
-        print("缺少 KGI_ID 或 KGI_PASSWORD，請確認 .env 設定。")
-        sys.exit(1)
-        
-    # --- KGI 憑證路徑 Monkey Patch ---
-    # 藉由攔截底層 TradeComAPI.Login，在實際呼叫 C++ Login 之前塞入憑證設定
-    from kgisuperpy.pushClient.pyTradeCom import TradeComAPI
-    if not hasattr(TradeComAPI, '_Login_original'):
-        TradeComAPI._Login_original = TradeComAPI.Login
-
-    def kgi_login_with_cert(self, user_id, password):
-        cert_path = os.environ.get("CERT_PATH")
-        cert_pass = os.environ.get("CERT_PASS")
-        if cert_path and cert_pass:
-            print(f"🔧 [KGI] 偵測到環境變數 CERT_PATH，套用自訂憑證: {cert_path}")
-            self.SetCA_PFX(cert_path)
-            self.SetCA_PW(cert_pass)
-        self._Login_original(user_id, password)
-
-    TradeComAPI.Login = kgi_login_with_cert
-    # --------------------------------
-
-    try:
-        kgi_api = kgi.login(
-            person_id=kgi_id, 
-            person_pwd=kgi_pwd, 
-            simulation=False
-        )
-        time.sleep(3)
-        print("凱基登入完成。")
-    except Exception as e:
-        print(f"凱基登入失敗: {e}")
-        sys.exit(1)
-
-    print("初始化永豐期貨交易系統 (下單用)...")
+    print("初始化永豐期貨交易系統...")
 
     try:
         trader = Trader()
@@ -279,8 +216,8 @@ def main():
         
         strategies = strategies_60m + strategies_5m
 
-        # 定義行情 Callback (KGI 來源)
-        def on_kgi_tick(tick):
+        # 定義行情 Callback
+        def on_quote(exchange, quote):
             import pytz
             tw_tz = pytz.timezone('Asia/Taipei')
             now_tw = datetime.now(tw_tz)
@@ -293,32 +230,27 @@ def main():
             if is_pre_market(now_tw):
                 return
                 
+            # Shioaji quote object usually provides to_dict() or dict()
             tick_data = {}
-            try:
-                dt_str = str(getattr(tick, 'datetime', ''))
-                if len(dt_str) >= 14:
-                    dt_obj = datetime.strptime(dt_str[:14], "%Y%m%d%H%M%S")
-                    dt_obj = tw_tz.localize(dt_obj)
-                    tick_data['datetime'] = dt_obj
-                else:
-                    tick_data['datetime'] = now_tw
-                    
-                tick_data['close'] = float(getattr(tick, 'close', 0.0))
-                tick_data['volume'] = int(getattr(tick, 'volume', 0))
-                
-                # Check for bid/ask properties
-                bids = getattr(tick, 'bid_price', [])
-                asks = getattr(tick, 'ask_price', [])
+            if hasattr(quote, 'to_dict'):
+                tick_data = quote.to_dict()
+            elif hasattr(quote, 'dict'):
+                tick_data = quote.dict()
+            else:
+                # Fallback: try to act like a dict
+                try:
+                    tick_data = dict(quote)
+                except:
+                    # print(f"DEBUG: Unknown quote type: {type(quote)}")
+                    return
+
+            # 如果是 BidAsk 報價 (沒有 close)，透過買賣報價中位數補齊 close 以免監控畫面停滯
+            if 'bid_price' in tick_data and 'ask_price' in tick_data:
+                bids = tick_data.get('bid_price', [])
+                asks = tick_data.get('ask_price', [])
                 if bids and asks and len(bids) > 0 and len(asks) > 0:
                     tick_data['close'] = (float(bids[0]) + float(asks[0])) / 2.0
-
-            except Exception as e:
-                # print(f"Error parsing KGI tick: {e}")
-                return
-                
-            if tick_data.get('close', 0) <= 0:
-                return
-
+            
             latest_quote.update(tick_data)
             
             # === TICK-LEVEL EXIT CHECK ===
@@ -385,20 +317,22 @@ def main():
                 except Exception as e:
                     print(f"Error in on_quote strategy logic: {e}")
 
-        # 設定 Callback (KGI 來源)
-        try:
-            kgi_api.FutQuote.set_cb_tick(on_kgi_tick)
-            kgi_api.FutQuote.set_cb_bidask(on_kgi_tick)
-        except Exception as e:
-            print(f"⚠️ 設定 KGI callback 失敗: {e}", flush=True)
+        # 設定 Callback (Futures/Options)
+        trader.api.quote.set_on_tick_fop_v1_callback(on_quote)
+        trader.api.quote.set_on_bidask_fop_v1_callback(on_quote)
 
-        kgi_symbol = os.environ.get("KGI_QUOTE_SYMBOL", "TXF")
-        print(f"訂閱 KGI {kgi_symbol} 即時行情 (報價)...", flush=True)
-        try:
-            kgi_api.FutQuote.subscribe_tick(kgi_symbol)
-            kgi_api.FutQuote.subscribe_bidask(kgi_symbol)
-        except Exception as e:
-            print(f"⚠️ KGI 訂閱失敗: {e}", flush=True)
+        # 訂閱行情
+        print(f"訂閱 {target_contract.code} 即時行情 (Tick & BidAsk)...", flush=True)
+        trader.api.quote.subscribe(
+            target_contract, 
+            quote_type=sj.constant.QuoteType.Tick,
+            version=sj.constant.QuoteVersion.v1
+        )
+        trader.api.quote.subscribe(
+            target_contract, 
+            quote_type=sj.constant.QuoteType.BidAsk,
+            version=sj.constant.QuoteVersion.v1
+        )
 
         # Keep the program running and print quote every 1 minute
         print("系統運行中，按 Ctrl+C 停止...")
