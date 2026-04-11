@@ -51,7 +51,17 @@ import time
 from datetime import datetime
 import shioaji as sj
 from src.connection import Trader
-import kgisuperpy as kgi
+
+# --- Zeabur Cache Bypass: Force dynamic installation of KGI API ---
+import subprocess
+import sys
+try:
+    import kgisuperpy as kgi
+except ImportError:
+    print("👉 [Auto-Install] kgisuperpy not found (Zeabur cache issue). Installing dynamically...", flush=True)
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "kgisuperpy==2.0.3"])
+    import kgisuperpy as kgi
+# ------------------------------------------------------------------
 from dotenv import load_dotenv
 from src.processors.kline_maker import KLineMaker
 from src.discord_notify import send_discord_message
