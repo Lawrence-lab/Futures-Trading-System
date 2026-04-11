@@ -58,8 +58,21 @@ import sys
 try:
     import kgisuperpy as kgi
 except ImportError:
-    print("👉 [Auto-Install] kgisuperpy not found (Zeabur cache issue). Installing dynamically...", flush=True)
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "kgisuperpy==2.0.3"])
+    print("👉 [Auto-Install] kgisuperpy not found. Installing dynamically...", flush=True)
+    try:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "kgisuperpy==2.0.3"])
+    except subprocess.CalledProcessError:
+        print("👉 [Auto-Install] Standard install failed (likely kaleido dependency on Linux/ARM). Falling back to --no-deps...", flush=True)
+        # Install kgisuperpy without dependencies
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "kgisuperpy==2.0.3", "--no-deps"])
+        # Manually install required dependencies excluding the broken kaleido package
+        deps = [
+            "matplotlib", "seaborn", "IPython", "cryptography", 
+            "websocket-client", "dash", "tqdm", "paramiko", 
+            "numba", "diskcache", "plotly==5.9.0"
+        ]
+        subprocess.check_call([sys.executable, "-m", "pip", "install"] + deps)
+        
     import kgisuperpy as kgi
 # ------------------------------------------------------------------
 from dotenv import load_dotenv
